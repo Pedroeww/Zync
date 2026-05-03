@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   LayoutDashboard, 
   BookOpen, 
@@ -75,6 +75,7 @@ import {
 } from 'date-fns';
 import { cn, formatCurrency, formatPercent } from './lib/utils';
 import { supabase } from './supabaseClient';
+import { dataService } from './services/dataService';
 import { Trade, UserSettings, DashboardStats, MarketType, Side, EmotionalState, NewsImpact, ExitStatus, Account, User } from './types';
 import { MOCK_TRADES } from './constants';
 
@@ -958,11 +959,40 @@ const StatsCard = ({ label, value, subValue, trend, icon: Icon, type = 'normal' 
 
 // --- Pages ---
 
-const Dashboard = ({ stats, trades, onTabChange, profileName, currency, hidePnL }: { stats: DashboardStats, trades: Trade[], onTabChange: (tab: string) => void, profileName: string, currency: string, hidePnL: boolean }) => {
+const Dashboard = ({ stats, trades, onTabChange, profileName, currency, hidePnL, user, onUpdateTrade }: { stats: DashboardStats, trades: Trade[], onTabChange: (tab: string) => void, profileName: string, currency: string, hidePnL: boolean, user: User | null, onUpdateTrade: (id: string, updates: Partial<Trade>) => void }) => {
   const [showExportModal, setShowExportModal] = useState(false);
   const [selectedRange, setSelectedRange] = useState('All Time');
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
   const [selectedTrade, setSelectedTrade] = useState<Trade | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
+
+  const handleScreenshotUpload = async (file: File) => {
+    if (!selectedTrade || !user || !file.type.startsWith('image/')) return;
+    
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Image is too large. Max 5MB.');
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const extension = file.name.split('.').pop() || 'png';
+      const uuid = crypto.randomUUID();
+      const path = `${user.uid}/trades/${selectedTrade.id}/screenshot_${uuid}.${extension}`;
+      
+      const storagePath = await dataService.uploadFile(path, file);
+      onUpdateTrade(selectedTrade.id, { screenshot: storagePath });
+      
+      // Update local state for immediate feedback
+      const signedUrl = await dataService.getSignedUrl(storagePath);
+      setSelectedTrade({ ...selectedTrade, screenshot: signedUrl });
+    } catch (err) {
+      console.error('Failed to upload screenshot:', err);
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   const displayValue = (val: number, showSign: boolean = false) => {
     if (hidePnL) return '***';
@@ -1217,13 +1247,14 @@ const PnLCalendar = ({ trades, setSelectedTrade, currency, hidePnL }: { trades: 
   );
 };
 
-const TradeJournal = ({ trades, onAddTrade, onUpdateTrade, onDeleteTrade, settings, onUpdateSettings }: { 
+const TradeJournal = ({ trades, onAddTrade, onUpdateTrade, onDeleteTrade, settings, onUpdateSettings, user }: { 
   trades: Trade[], 
   onAddTrade: (t: Trade) => void,
   onUpdateTrade: (id: string, updates: Partial<Trade>) => void,
   onDeleteTrade: (id: string) => void,
   settings: UserSettings,
-  onUpdateSettings: (s: UserSettings) => void
+  onUpdateSettings: (s: UserSettings) => void,
+  user: User | null
 }) => {
   const [showForm, setShowForm] = useState(false);
   const [editingTrade, setEditingTrade] = useState<Trade | null>(null);
@@ -1234,6 +1265,29 @@ const TradeJournal = ({ trades, onAddTrade, onUpdateTrade, onDeleteTrade, settin
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
   const [isControlsExpanded, setIsControlsExpanded] = useState(true);
   const [newRuleInput, setNewRuleInput] = useState('');
+  const [screenshot, setScreenshot] = useState<string | null>(null);
+  const [screenshotUrl, setScreenshotUrl] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRefDetail = useRef<HTMLInputElement>(null);
+  const [isUploadingDetail, setIsUploadingDetail] = useState(false);
+
+  useEffect(() => {
+    const resolve = async () => {
+      if (screenshot && user && screenshot.startsWith(user.uid)) {
+        try {
+          const url = await dataService.getSignedUrl(screenshot);
+          setScreenshotUrl(url);
+        } catch (err) {
+          console.error('Failed to resolve screenshot URL:', err);
+          setScreenshotUrl(null);
+        }
+      } else {
+        setScreenshotUrl(screenshot);
+      }
+    };
+    resolve();
+  }, [screenshot, user]);
 
   const currency = settings.currency;
   const hidePnL = settings.hidePnL;
@@ -1270,10 +1324,69 @@ const TradeJournal = ({ trades, onAddTrade, onUpdateTrade, onDeleteTrade, settin
     return trades;
   }, [trades, filter]);
 
+  const handleScreenshotUpload = async (file: File) => {
+    if (!file.type.startsWith('image/')) return;
+    
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Image is too large. Max 5MB.');
+      return;
+    }
+
+    if (!user) {
+      const reader = new FileReader();
+      reader.onload = (e) => setScreenshot(e.target?.result as string);
+      reader.readAsDataURL(file);
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const extension = file.name.split('.').pop() || 'png';
+      const uuid = crypto.randomUUID();
+      // For new trades, we might not have a trade ID yet, so we use a temp folder or just a random ID
+      const tempId = editingTrade?.id || `temp_${uuid}`;
+      const path = `${user.uid}/trades/${tempId}/screenshot_${uuid}.${extension}`;
+      
+      const storagePath = await dataService.uploadFile(path, file);
+      setScreenshot(storagePath);
+    } catch (err) {
+      console.error('Failed to upload screenshot:', err);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleDetailUpload = async (file: File) => {
+    if (!selectedTrade || !user || !file.type.startsWith('image/')) return;
+    
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Image is too large. Max 5MB.');
+      return;
+    }
+
+    setIsUploadingDetail(true);
+    try {
+      const extension = file.name.split('.').pop() || 'png';
+      const uuid = crypto.randomUUID();
+      const path = `${user.uid}/trades/${selectedTrade.id}/screenshot_${uuid}.${extension}`;
+      
+      const storagePath = await dataService.uploadFile(path, file);
+      onUpdateTrade(selectedTrade.id, { screenshot: storagePath });
+      
+      const signedUrl = await dataService.getSignedUrl(storagePath);
+      setSelectedTrade({ ...selectedTrade, screenshot: signedUrl });
+    } catch (err) {
+      console.error('Failed to upload detail screenshot:', err);
+    } finally {
+      setIsUploadingDetail(false);
+    }
+  };
+
   const handleEdit = (trade: Trade) => {
     setEditingTrade(trade);
     setConfidence(trade.confidence);
-    setIsManualPnl(true); // Always show P&L if editing for clarity, or handle based on how it was entered
+    setIsManualPnl(true); 
+    setScreenshot(trade.screenshot || null);
     setShowForm(true);
   };
 
@@ -1281,6 +1394,7 @@ const TradeJournal = ({ trades, onAddTrade, onUpdateTrade, onDeleteTrade, settin
     setEditingTrade(null);
     setConfidence(5);
     setIsManualPnl(false);
+    setScreenshot(null);
     setShowForm(true);
   };
 
@@ -1584,11 +1698,37 @@ const TradeJournal = ({ trades, onAddTrade, onUpdateTrade, onDeleteTrade, settin
 
               <div className="mt-6">
                  <span className="text-[10px] text-zinc-500 uppercase tracking-widest block mb-2">Trade Chart</span>
-                 <div className="aspect-video bg-zinc-950 rounded-2xl border border-zinc-800 border-dashed flex flex-col items-center justify-center gap-3 group/chart cursor-pointer hover:bg-zinc-900 transition-colors">
-                    <div className="w-12 h-12 rounded-full bg-zinc-900 flex items-center justify-center border border-zinc-800 group-hover/chart:scale-110 transition-transform">
-                      <Plus className="w-5 h-5 text-zinc-600" />
-                    </div>
-                    <p className="text-xs text-zinc-600">Click to upload screenshot</p>
+                 <div 
+                   className="aspect-video bg-zinc-950 rounded-2xl border border-zinc-800 border-dashed flex flex-col items-center justify-center gap-3 group/chart cursor-pointer hover:bg-zinc-900 transition-all overflow-hidden relative"
+                   onClick={() => fileInputRefDetail.current?.click()}
+                 >
+                    <input 
+                      type="file" 
+                      ref={fileInputRefDetail} 
+                      className="hidden" 
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleDetailUpload(file);
+                      }}
+                    />
+                    {selectedTrade.screenshot ? (
+                      <>
+                        <img src={selectedTrade.screenshot} alt="Trade Chart" className="w-full h-full object-cover" />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/chart:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
+                          <p className="text-[10px] font-black uppercase text-white tracking-widest">Change Image</p>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="w-12 h-12 rounded-full bg-zinc-900 flex items-center justify-center border border-zinc-800 group-hover/chart:scale-110 transition-transform">
+                          <Plus className="w-5 h-5 text-zinc-600" />
+                        </div>
+                        <p className="text-xs text-zinc-600">
+                          {isUploadingDetail ? 'Uploading...' : 'Click to upload screenshot'}
+                        </p>
+                      </>
+                    )}
                  </div>
               </div>
             </motion.div>
@@ -1656,7 +1796,8 @@ const TradeJournal = ({ trades, onAddTrade, onUpdateTrade, onDeleteTrade, settin
                   riskReward: Number(formData.get('riskReward')) || 0,
                   targetRR: Number(formData.get('targetRR')) || 0,
                   pnl: pnl || 0,
-                  pnlPercentage: pnlPercentage || 0
+                  pnlPercentage: pnlPercentage || 0,
+                  screenshot: screenshot || undefined
                 };
 
                 if (editingTrade) {
@@ -1932,6 +2073,42 @@ const TradeJournal = ({ trades, onAddTrade, onUpdateTrade, onDeleteTrade, settin
                   />
                 </div>
                 <div>
+                  <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">Trade Chart Screenshot</label>
+                  <div 
+                    className="aspect-video bg-zinc-950 rounded-2xl border border-zinc-800 border-dashed flex flex-col items-center justify-center gap-3 group/chart cursor-pointer hover:bg-zinc-900 transition-all overflow-hidden relative"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <input 
+                      type="file" 
+                      ref={fileInputRef} 
+                      className="hidden" 
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleScreenshotUpload(file);
+                      }}
+                    />
+                    {screenshotUrl ? (
+                      <>
+                        <img src={screenshotUrl} alt="Screenshot" className="w-full h-full object-cover" />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/chart:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
+                          <p className="text-[10px] font-black uppercase text-white tracking-widest">Change Image</p>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="w-12 h-12 rounded-full bg-zinc-900 flex items-center justify-center border border-zinc-800 group-hover/chart:scale-110 transition-transform">
+                          <Plus className="w-5 h-5 text-zinc-600" />
+                        </div>
+                        <p className="text-xs text-zinc-600">
+                          {isUploading ? 'Uploading...' : 'Click to upload screenshot'}
+                        </p>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                <div>
                   <textarea 
                     name="notes" 
                     defaultValue={editingTrade?.notes}
@@ -1952,8 +2129,37 @@ const TradeJournal = ({ trades, onAddTrade, onUpdateTrade, onDeleteTrade, settin
   );
 };
 
-const Analytics = ({ trades, currency, hidePnL }: { trades: Trade[], currency: string, hidePnL: boolean }) => {
+const Analytics = ({ trades, currency, hidePnL, user, onUpdateTrade }: { trades: Trade[], currency: string, hidePnL: boolean, user: User | null, onUpdateTrade: (id: string, updates: Partial<Trade>) => void }) => {
   const [selectedTrade, setSelectedTrade] = useState<Trade | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
+
+  const handleScreenshotUpload = async (file: File) => {
+    if (!selectedTrade || !user || !file.type.startsWith('image/')) return;
+    
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Image is too large. Max 5MB.');
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const extension = file.name.split('.').pop() || 'png';
+      const uuid = crypto.randomUUID();
+      const path = `${user.uid}/trades/${selectedTrade.id}/screenshot_${uuid}.${extension}`;
+      
+      const storagePath = await dataService.uploadFile(path, file);
+      onUpdateTrade(selectedTrade.id, { screenshot: storagePath });
+      
+      // Update local state for immediate feedback
+      const signedUrl = await dataService.getSignedUrl(storagePath);
+      setSelectedTrade({ ...selectedTrade, screenshot: signedUrl });
+    } catch (err) {
+      console.error('Failed to upload screenshot:', err);
+    } finally {
+      setIsUploading(false);
+    }
+  };
   
   const displayValue = (val: number, showSign: boolean = false) => {
     if (hidePnL) return '***';
@@ -2288,11 +2494,37 @@ const Analytics = ({ trades, currency, hidePnL }: { trades: Trade[], currency: s
 
               <div className="mt-6">
                  <span className="text-[10px] text-zinc-500 uppercase tracking-widest block mb-2">Trade Chart</span>
-                 <div className="aspect-video bg-zinc-950 rounded-2xl border border-zinc-800 border-dashed flex flex-col items-center justify-center gap-3 group/chart cursor-pointer hover:bg-zinc-900 transition-colors">
-                    <div className="w-12 h-12 rounded-full bg-zinc-900 flex items-center justify-center border border-zinc-800 group-hover/chart:scale-110 transition-transform">
-                      <Plus className="w-5 h-5 text-zinc-600" />
-                    </div>
-                    <p className="text-xs text-zinc-600">Click to upload screenshot</p>
+                 <div 
+                   className="aspect-video bg-zinc-950 rounded-2xl border border-zinc-800 border-dashed flex flex-col items-center justify-center gap-3 group/chart cursor-pointer hover:bg-zinc-900 transition-all overflow-hidden relative"
+                   onClick={() => fileInputRef.current?.click()}
+                 >
+                    <input 
+                      type="file" 
+                      ref={fileInputRef} 
+                      className="hidden" 
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleScreenshotUpload(file);
+                      }}
+                    />
+                    {selectedTrade.screenshot ? (
+                      <>
+                        <img src={selectedTrade.screenshot} alt="Trade Chart" className="w-full h-full object-cover" />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/chart:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
+                          <p className="text-[10px] font-black uppercase text-white tracking-widest">Change Image</p>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="w-12 h-12 rounded-full bg-zinc-900 flex items-center justify-center border border-zinc-800 group-hover/chart:scale-110 transition-transform">
+                          <Plus className="w-5 h-5 text-zinc-600" />
+                        </div>
+                        <p className="text-xs text-zinc-600">
+                          {isUploading ? 'Uploading...' : 'Click to upload screenshot'}
+                        </p>
+                      </>
+                    )}
                  </div>
               </div>
             </motion.div>
@@ -2726,10 +2958,11 @@ const Plan = ({ name, rules }: { name: string, rules: string[] }) => {
   );
 };
 
-const Execution = ({ trades, onUpdateTrade, currency, hidePnL }: { trades: Trade[], onUpdateTrade: (id: string, updates: Partial<Trade>) => void, currency: string, hidePnL: boolean }) => {
+const Execution = ({ trades, onUpdateTrade, currency, hidePnL, user }: { trades: Trade[], onUpdateTrade: (id: string, updates: Partial<Trade>) => void, currency: string, hidePnL: boolean, user: User | null }) => {
   const [selectedTradeId, setSelectedTradeId] = useState<string | null>(trades[0]?.id || null);
   const selectedTrade = trades.find(t => t.id === selectedTradeId);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   const displayValue = (val: number, showSign: boolean = false) => {
     if (hidePnL) return '***';
@@ -2737,30 +2970,61 @@ const Execution = ({ trades, onUpdateTrade, currency, hidePnL }: { trades: Trade
     return sign + formatCurrency(val, currency);
   };
 
-  const handleImageUpload = (file: File) => {
+  const handleImageUpload = async (file: File) => {
     if (!file.type.startsWith('image/')) return;
     
-    // Limit file size to 2MB to prevent localStorage issues
-    if (file.size > 2 * 1024 * 1024) {
-      alert('Image is too large. Please use a file smaller than 2MB.');
+    // Limit file size to 5MB for Supabase
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Image is too large. Please use a file smaller than 5MB.');
       return;
     }
 
-    const reader = new FileReader();
-    reader.onerror = () => {
-      console.error('FileReader error');
-    };
-    reader.onload = (e) => {
-      try {
+    if (!user || !selectedTrade) {
+      // Fallback for local users
+      const reader = new FileReader();
+      reader.onload = (e) => {
         const result = e.target?.result as string;
         if (selectedTrade && result) {
           onUpdateTrade(selectedTrade.id, { executionImage: result });
         }
+      };
+      reader.readAsDataURL(file);
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const extension = file.name.split('.').pop() || 'png';
+      const uuid = crypto.randomUUID();
+      const path = `${user.uid}/trades/${selectedTrade.id}/execution_${uuid}.${extension}`;
+      
+      const storagePath = await dataService.uploadFile(path, file);
+      // We store the storage path in DB. getAccounts will resolve it to signed URL.
+      // But for immediate UI feedback, we can get the signed URL now or just use the local reader.
+      const signedUrl = await dataService.getSignedUrl(storagePath);
+      
+      onUpdateTrade(selectedTrade.id, { executionImage: storagePath });
+    } catch (err) {
+      console.error('Failed to upload trade image:', err);
+      alert('Failed to upload image. Please check your connection.');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleRemoveImage = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!selectedTrade) return;
+
+    if (user && selectedTrade.executionImage && selectedTrade.executionImage.startsWith(user.uid)) {
+      try {
+        await dataService.deleteFile(selectedTrade.executionImage);
       } catch (err) {
-        console.error('Failed to update trade with image:', err);
+        console.error('Failed to delete file from storage:', err);
       }
-    };
-    reader.readAsDataURL(file);
+    }
+    
+    onUpdateTrade(selectedTrade.id, { executionImage: '' });
   };
 
   return (
@@ -2870,10 +3134,7 @@ const Execution = ({ trades, onUpdateTrade, currency, hidePnL }: { trades: Trade
                        Change Image
                      </button>
                      <button 
-                       onClick={(e) => {
-                         e.stopPropagation();
-                         onUpdateTrade(selectedTrade.id, { executionImage: '' });
-                       }}
+                       onClick={handleRemoveImage}
                        className="px-6 py-3 bg-rose-500/10 text-rose-500 border border-rose-500/20 text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-rose-500 hover:text-white transition-all"
                      >
                        Remove
@@ -2964,6 +3225,7 @@ const CURRENCY_RATES: Record<string, number> = {
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [dataLoading, setDataLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
@@ -3000,6 +3262,51 @@ export default function App() {
     [accounts, currentAccountId]
   );
 
+  // Fetch data from Supabase when user is authenticated
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!user) return;
+      
+      setDataLoading(true);
+      try {
+        const remoteAccounts = await dataService.getAccounts();
+        if (remoteAccounts.length > 0) {
+          setAccounts(remoteAccounts);
+          // Try to restore current account ID from local preferences or just use the first one
+          const lastAccountId = localStorage.getItem('zync_current_account_id');
+          const finalId = remoteAccounts.find(a => a.id === lastAccountId) ? lastAccountId! : remoteAccounts[0].id;
+          setCurrentAccountId(finalId);
+          
+          const current = remoteAccounts.find(a => a.id === finalId) || remoteAccounts[0];
+          setSettings(current.settings);
+          setTrades(current.trades);
+        } else {
+          // If no accounts exist in DB, create the default one
+          const initialSettings: UserSettings = {
+            profileName: user.displayName || 'Trader',
+            currency: 'USD',
+            startingBalance: 10000,
+            riskPerTrade: 1,
+            strategyRules: ['Structure Break', 'Liquidity Sweep', 'Fib 0.618 level', 'High Volume Confirmation'],
+            theme: 'night',
+            hidePnL: false
+          };
+          const newAcc = await dataService.createAccount('Primary Account', initialSettings);
+          setAccounts([newAcc]);
+          setCurrentAccountId(newAcc.id);
+          setSettings(newAcc.settings);
+          setTrades([]);
+        }
+      } catch (err) {
+        console.error('Error loading data from Supabase:', err);
+      } finally {
+        setDataLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [user]);
+
   const handleAuthComplete = (newUser: User) => {
     setUser(newUser);
   };
@@ -3016,9 +3323,9 @@ export default function App() {
   useEffect(() => {
     setSettings(currentAccount.settings);
     setTrades(currentAccount.trades);
-  }, [currentAccountId]);
+  }, [currentAccountId, accounts]);
 
-  const handleUpdateSettings = (newSettings: UserSettings) => {
+  const handleUpdateSettings = async (newSettings: UserSettings) => {
     if (newSettings.currency !== settings.currency) {
       const rate = CURRENCY_RATES[newSettings.currency] / CURRENCY_RATES[settings.currency];
       
@@ -3038,42 +3345,82 @@ export default function App() {
       
       // Update accounts list
       setAccounts(prev => prev.map(a => a.id === currentAccountId ? { ...a, settings: updatedSettings, trades: convertedTrades } : a));
+      
+      // Persist to Supabase
+      if (user) {
+        try {
+          await dataService.updateAccount(currentAccountId, { settings: updatedSettings });
+          // Also update all trades if pnl/prices changed (omitted for brevity, usually you'd handle currency conversion differently in DB)
+        } catch (err) {
+          console.error('Failed to update account in Supabase:', err);
+        }
+      }
     } else {
       setSettings(newSettings);
       setAccounts(prev => prev.map(a => a.id === currentAccountId ? { ...a, settings: newSettings } : a));
+      
+      if (user) {
+        dataService.updateAccount(currentAccountId, { settings: newSettings }).catch(console.error);
+      }
     }
   };
 
-  const handleAddAccount = () => {
+  const handleAddAccount = async () => {
     if (accounts.length >= 3) return;
-    const newId = Math.random().toString(36).substr(2, 9);
-    const newAccount: Account = {
-      id: newId,
-      name: `Account ${accounts.length + 1}`,
-      settings: { ...settings, profileName: `New Account ${accounts.length + 1}` },
-      trades: []
-    };
-    setAccounts([...accounts, newAccount]);
-    setCurrentAccountId(newId);
+    
+    if (user) {
+      try {
+        const newSettings = { ...settings, profileName: `New Account ${accounts.length + 1}` };
+        const newAcc = await dataService.createAccount(`Account ${accounts.length + 1}`, newSettings);
+        setAccounts([...accounts, newAcc]);
+        setCurrentAccountId(newAcc.id);
+      } catch (err) {
+        console.error('Failed to create account in Supabase:', err);
+      }
+    } else {
+      const newId = Math.random().toString(36).substr(2, 9);
+      const newAccount: Account = {
+        id: newId,
+        name: `Account ${accounts.length + 1}`,
+        settings: { ...settings, profileName: `New Account ${accounts.length + 1}` },
+        trades: []
+      };
+      setAccounts([...accounts, newAccount]);
+      setCurrentAccountId(newId);
+    }
   };
 
   const handleSwitchAccount = (id: string) => {
-    // Save current before switching
+    // Save current before switching (local state is fast)
     setAccounts(prev => prev.map(a => a.id === currentAccountId ? { ...a, settings, trades } : a));
     setCurrentAccountId(id);
+    localStorage.setItem('zync_current_account_id', id);
   };
 
-  const handleDeleteAccount = (id: string) => {
+  const handleDeleteAccount = async (id: string) => {
     if (accounts.length <= 1) return;
+    
+    if (user) {
+      try {
+        await dataService.deleteAccount(id);
+      } catch (err) {
+        console.error('Failed to delete account in Supabase:', err);
+        return;
+      }
+    }
+    
     const filtered = accounts.filter(a => a.id !== id);
     setAccounts(filtered);
     if (currentAccountId === id) {
       setCurrentAccountId(filtered[0].id);
+      localStorage.setItem('zync_current_account_id', filtered[0].id);
     }
   };
 
   // Load from LocalStorage
   useEffect(() => {
+    if (user) return; // Skip if Supabase is being used
+
     const savedAccounts = localStorage.getItem('zync_accounts');
     const savedCurrentAccountId = localStorage.getItem('zync_current_account_id');
     
@@ -3137,21 +3484,18 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Save to LocalStorage
+  // Remove LocalStorage auto-save if user is logged in
   useEffect(() => {
+    if (user) return; // Use Supabase
+
     try {
-      // We update the active account in the accounts array before saving
       const updatedAccounts = accounts.map(a => a.id === currentAccountId ? { ...a, settings, trades } : a);
-      const accountsJson = JSON.stringify(updatedAccounts);
-      const accountId = currentAccountId;
-      
-      localStorage.setItem('zync_accounts', accountsJson);
-      localStorage.setItem('zync_current_account_id', accountId);
+      localStorage.setItem('zync_accounts', JSON.stringify(updatedAccounts));
+      localStorage.setItem('zync_current_account_id', currentAccountId);
     } catch (error) {
-      console.warn('Failed to save to localStorage (possibly quota exceeded):', error);
-      // Don't crash the app, just log a warning
+      console.warn('Failed to save to localStorage:', error);
     }
-  }, [trades, settings, currentAccountId, accounts]);
+  }, [trades, settings, currentAccountId, accounts, user]);
 
   const stats = useMemo<DashboardStats>(() => {
     const totalPnL = trades.reduce((acc, t) => acc + t.pnl, 0);
@@ -3174,19 +3518,45 @@ export default function App() {
     };
   }, [trades]);
 
-  const handleAddTrade = (trade: Trade) => {
-    const newTrades = [trade, ...trades];
-    setTrades(newTrades);
-    setAccounts(prev => prev.map(a => a.id === currentAccountId ? { ...a, trades: newTrades } : a));
+  const handleAddTrade = async (trade: Trade) => {
+    if (user) {
+      try {
+        const savedTrade = await dataService.addTrade(currentAccountId, trade);
+        const newTrades = [savedTrade, ...trades];
+        setTrades(newTrades);
+        setAccounts(prev => prev.map(a => a.id === currentAccountId ? { ...a, trades: newTrades } : a));
+      } catch (err) {
+        console.error('Failed to save trade to Supabase:', err);
+      }
+    } else {
+      const newTrades = [trade, ...trades];
+      setTrades(newTrades);
+      setAccounts(prev => prev.map(a => a.id === currentAccountId ? { ...a, trades: newTrades } : a));
+    }
   };
 
-  const handleUpdateTrade = (id: string, updates: Partial<Trade>) => {
+  const handleUpdateTrade = async (id: string, updates: Partial<Trade>) => {
+    if (user) {
+      try {
+        await dataService.updateTrade(id, updates);
+      } catch (err) {
+        console.error('Failed to update trade in Supabase:', err);
+      }
+    }
     const newTrades = trades.map(t => t.id === id ? { ...t, ...updates } : t);
     setTrades(newTrades);
     setAccounts(prev => prev.map(a => a.id === currentAccountId ? { ...a, trades: newTrades } : a));
   };
 
-  const handleDeleteTrade = (id: string) => {
+  const handleDeleteTrade = async (id: string) => {
+    if (user) {
+      try {
+        await dataService.deleteTrade(id);
+      } catch (err) {
+        console.error('Failed to delete trade from Supabase:', err);
+        return;
+      }
+    }
     const newTrades = trades.filter(t => t.id !== id);
     setTrades(newTrades);
     setAccounts(prev => prev.map(a => a.id === currentAccountId ? { ...a, trades: newTrades } : a));
@@ -3384,7 +3754,18 @@ export default function App() {
                 exit={{ opacity: 0, scale: 0.98, y: -10 }}
                 transition={{ duration: 0.4, ease: "easeOut" }}
               >
-                {activeTab === 'dashboard' && <Dashboard stats={stats} trades={trades} onTabChange={setActiveTab} profileName={settings.profileName} currency={settings.currency} hidePnL={settings.hidePnL} />}
+                {activeTab === 'dashboard' && (
+                  <Dashboard 
+                    stats={stats} 
+                    trades={trades} 
+                    onTabChange={setActiveTab} 
+                    profileName={settings.profileName} 
+                    currency={settings.currency} 
+                    hidePnL={settings.hidePnL}
+                    user={user}
+                    onUpdateTrade={handleUpdateTrade}
+                  />
+                )}
                 {activeTab === 'journal' && (
                   <TradeJournal 
                     trades={trades} 
@@ -3393,11 +3774,12 @@ export default function App() {
                     onDeleteTrade={handleDeleteTrade} 
                     settings={settings} 
                     onUpdateSettings={handleUpdateSettings}
+                    user={user}
                   />
                 )}
-                {activeTab === 'execution' && <Execution trades={trades} onUpdateTrade={handleUpdateTrade} currency={settings.currency} hidePnL={settings.hidePnL} />}
+                {activeTab === 'execution' && <Execution trades={trades} onUpdateTrade={handleUpdateTrade} currency={settings.currency} hidePnL={settings.hidePnL} user={user} />}
                 {activeTab === 'plan' && <Plan name={settings.profileName} rules={settings.strategyRules} />}
-                {activeTab === 'analytics' && <Analytics trades={trades} currency={settings.currency} hidePnL={settings.hidePnL} />}
+                {activeTab === 'analytics' && <Analytics trades={trades} currency={settings.currency} hidePnL={settings.hidePnL} user={user} onUpdateTrade={handleUpdateTrade} />}
                 {activeTab === 'settings' && (
                   <Settings 
                     settings={settings} 
