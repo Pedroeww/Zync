@@ -74,6 +74,7 @@ import {
   startOfYear
 } from 'date-fns';
 import { cn, formatCurrency, formatPercent } from './lib/utils';
+import { supabase } from './supabaseClient';
 import { Trade, UserSettings, DashboardStats, MarketType, Side, EmotionalState, NewsImpact, ExitStatus, Account, User } from './types';
 import { MOCK_TRADES } from './constants';
 
@@ -171,25 +172,22 @@ const AuthPage = ({ onAuthComplete, theme, embedded = false }: AuthPageProps) =>
   const [displayName, setDisplayName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const handleSocialLogin = async (provider: 'google' | 'apple') => {
     setLoading(true);
     setError(null);
+    setSuccessMessage(null);
     try {
-      // Prepare for real Firebase Auth implementation
-      // Once Firebase is officially connected, replace these with:
-      // await signInWithPopup(auth, provider === 'google' ? googleProvider : appleProvider);
-      
-      await new Promise(resolve => setTimeout(resolve, 1200));
-      const mockUser: User = {
-        uid: `social_${Math.random().toString(36).substr(2, 9)}`,
-        email: provider === 'google' ? 'trader.google@gmail.com' : 'trader.apple@icloud.com',
-        displayName: provider === 'google' ? 'Google Trader' : 'Apple Merchant'
-      };
-      onAuthComplete(mockUser);
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: provider === 'google' ? 'google' : 'apple',
+        options: {
+          redirectTo: window.location.origin,
+        },
+      });
+      if (error) throw error;
     } catch (err: any) {
-      setError(`Failed to connect with ${provider}`);
-    } finally {
+      setError(err.message || `Failed to connect with ${provider}`);
       setLoading(false);
     }
   };
@@ -198,20 +196,52 @@ const AuthPage = ({ onAuthComplete, theme, embedded = false }: AuthPageProps) =>
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setSuccessMessage(null);
     
     try {
-      // Future Firebase Integration:
-      // if (isSignUp) await createUserWithEmailAndPassword(auth, email, password);
-      // else await signInWithEmailAndPassword(auth, email, password);
-      
-      const mockUser: User = {
-        uid: 'user_' + Math.random().toString(36).substr(2, 9),
-        email: email || 'trader@example.com',
-        displayName: displayName || email.split('@')[0] || 'Trader'
-      };
-      
-      await new Promise(resolve => setTimeout(resolve, 800));
-      onAuthComplete(mockUser);
+      if (isSignUp) {
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: {
+              full_name: displayName,
+            }
+          }
+        });
+        if (error) throw error;
+        
+        if (data.user && !data.session) {
+          // Email confirmation is likely required
+          setSuccessMessage("Your account has been created. Please check your email and verify your address before logging in.");
+          setIsSignUp(false);
+          setLoading(false);
+          return;
+        }
+
+        if (data.session && data.user) {
+          onAuthComplete({
+            uid: data.user.id,
+            email: data.user.email || '',
+            displayName: data.user.user_metadata?.full_name || displayName || 'Trader'
+          });
+        }
+      } else {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        if (error) throw error;
+        if (data.user && data.session) {
+          onAuthComplete({
+            uid: data.user.id,
+            email: data.user.email || '',
+            displayName: data.user.user_metadata?.full_name || 'Trader'
+          });
+        } else {
+          throw new Error("Could not establish session. Please check your credentials.");
+        }
+      }
     } catch (err: any) {
       setError(err.message || 'Authentication failed');
     } finally {
@@ -222,6 +252,13 @@ const AuthPage = ({ onAuthComplete, theme, embedded = false }: AuthPageProps) =>
   const containerStyles = embedded 
     ? "w-full p-4 md:p-8 bg-zinc-950/40" 
     : cn("min-h-screen flex items-center justify-center p-6 bg-[#0A0A0B]", theme === 'light' && "bg-zinc-50");
+
+  const toggleMode = () => {
+    setIsSignUp(!isSignUp);
+    setError(null);
+    setSuccessMessage(null);
+    setLoading(false);
+  };
 
   return (
     <div className={containerStyles}>
@@ -332,9 +369,17 @@ const AuthPage = ({ onAuthComplete, theme, embedded = false }: AuthPageProps) =>
           </div>
 
           {error && (
-            <p className="text-xs text-rose-400 text-center font-medium bg-rose-500/5 py-3 rounded-xl border border-rose-500/10">
-              {error}
-            </p>
+            <div className="mb-6 p-4 bg-rose-500/10 border border-rose-500/20 rounded-xl">
+              <p className="text-rose-400 text-[10px] uppercase tracking-wider font-black text-center">{error}</p>
+            </div>
+          )}
+
+          {successMessage && (
+            <div className="mb-6 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl animate-pulse">
+              <p className="text-emerald-400 text-[10px] uppercase tracking-wider font-black text-center leading-relaxed">
+                {successMessage}
+              </p>
+            </div>
           )}
 
           <button
@@ -350,7 +395,7 @@ const AuthPage = ({ onAuthComplete, theme, embedded = false }: AuthPageProps) =>
           <p className="text-xs text-zinc-500">
             {isSignUp ? 'Already have a vault?' : 'New to private journaling?'}
             <button
-              onClick={() => setIsSignUp(!isSignUp)}
+              onClick={toggleMode}
               className="ml-2 text-emerald-400 font-bold hover:text-emerald-300 transition-colors"
             >
               {isSignUp ? 'Access Vault' : 'Create Vault'}
@@ -2895,6 +2940,7 @@ const CURRENCY_RATES: Record<string, number> = {
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
@@ -2935,7 +2981,12 @@ export default function App() {
     setUser(newUser);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+    } catch (err) {
+      console.error('Error signing out:', err);
+    }
     setUser(null);
   };
 
@@ -3032,6 +3083,37 @@ export default function App() {
     }
   }, []);
 
+  // Authentication listener
+  useEffect(() => {
+    // Initial session check
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        setUser({
+          uid: session.user.id,
+          email: session.user.email || '',
+          displayName: session.user.user_metadata?.full_name || 'Trader'
+        });
+      }
+      setAuthLoading(false);
+    });
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        setUser({
+          uid: session.user.id,
+          email: session.user.email || '',
+          displayName: session.user.user_metadata?.full_name || 'Trader'
+        });
+      } else {
+        setUser(null);
+      }
+      setAuthLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
   // Save to LocalStorage
   useEffect(() => {
     try {
@@ -3086,6 +3168,21 @@ export default function App() {
     setTrades(newTrades);
     setAccounts(prev => prev.map(a => a.id === currentAccountId ? { ...a, trades: newTrades } : a));
   };
+
+  if (authLoading) {
+    return (
+      <div className="h-screen w-full flex items-center justify-center bg-[#0A0A0B]">
+        <div className="flex flex-col items-center gap-4">
+          <TrendingUp className="w-12 h-12 text-emerald-400 animate-pulse" />
+          <p className="text-zinc-500 text-xs font-black uppercase tracking-[0.3em] animate-pulse">Initializing ZYNC...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <AuthPage onAuthComplete={handleAuthComplete} theme={settings.theme} />;
+  }
 
   return (
     <div className={cn(
