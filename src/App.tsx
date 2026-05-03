@@ -33,7 +33,10 @@ import {
   Mail,
   Instagram,
   Shield,
-  FileText
+  FileText,
+  Lock,
+  Chrome,
+  Apple
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -71,10 +74,42 @@ import {
   startOfYear
 } from 'date-fns';
 import { cn, formatCurrency, formatPercent } from './lib/utils';
-import { Trade, UserSettings, DashboardStats, MarketType, Side, EmotionalState, NewsImpact, ExitStatus, Account } from './types';
+import { Trade, UserSettings, DashboardStats, MarketType, Side, EmotionalState, NewsImpact, ExitStatus, Account, User } from './types';
 import { MOCK_TRADES } from './constants';
 
 // --- Components ---
+
+const GlowingCursor = () => {
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [isPointer, setIsPointer] = useState(false);
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      setPosition({ x: e.clientX, y: e.clientY });
+      const target = e.target as HTMLElement;
+      setIsPointer(window.getComputedStyle(target).cursor === 'pointer' || target.tagName === 'BUTTON' || target.tagName === 'A');
+    };
+    window.addEventListener('mousemove', handleMouseMove, { passive: true });
+    return () => window.removeEventListener('mousemove', handleMouseMove);
+  }, []);
+
+  return (
+    <motion.div
+      className="fixed top-0 left-0 w-8 h-8 pointer-events-none z-[9999] rounded-full mix-blend-screen overflow-hidden hidden md:block"
+      animate={{
+        x: position.x - 16,
+        y: position.y - 16,
+        scale: isPointer ? 2 : 1,
+      }}
+      transition={{ type: 'spring', damping: 25, stiffness: 250, mass: 0.5 }}
+    >
+      <div className="w-full h-full bg-indigo-500/30 blur-xl rounded-full" />
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full shadow-[0_0_15px_6px_rgba(129,140,248,0.4)]" />
+      </div>
+    </motion.div>
+  );
+};
 
 interface MobileNavButtonProps {
   icon: any;
@@ -123,6 +158,221 @@ const QUOTES = [
   "Don't trade the P&L, trade the chart."
 ];
 
+interface AuthPageProps {
+  onAuthComplete: (user: User) => void;
+  theme: 'night' | 'light';
+  embedded?: boolean;
+}
+
+const AuthPage = ({ onAuthComplete, theme, embedded = false }: AuthPageProps) => {
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [displayName, setDisplayName] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSocialLogin = async (provider: 'google' | 'apple') => {
+    setLoading(true);
+    setError(null);
+    try {
+      // Prepare for real Firebase Auth implementation
+      // Once Firebase is officially connected, replace these with:
+      // await signInWithPopup(auth, provider === 'google' ? googleProvider : appleProvider);
+      
+      await new Promise(resolve => setTimeout(resolve, 1200));
+      const mockUser: User = {
+        uid: `social_${Math.random().toString(36).substr(2, 9)}`,
+        email: provider === 'google' ? 'trader.google@gmail.com' : 'trader.apple@icloud.com',
+        displayName: provider === 'google' ? 'Google Trader' : 'Apple Merchant'
+      };
+      onAuthComplete(mockUser);
+    } catch (err: any) {
+      setError(`Failed to connect with ${provider}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    
+    try {
+      // Future Firebase Integration:
+      // if (isSignUp) await createUserWithEmailAndPassword(auth, email, password);
+      // else await signInWithEmailAndPassword(auth, email, password);
+      
+      const mockUser: User = {
+        uid: 'user_' + Math.random().toString(36).substr(2, 9),
+        email: email || 'trader@example.com',
+        displayName: displayName || email.split('@')[0] || 'Trader'
+      };
+      
+      await new Promise(resolve => setTimeout(resolve, 800));
+      onAuthComplete(mockUser);
+    } catch (err: any) {
+      setError(err.message || 'Authentication failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const containerStyles = embedded 
+    ? "w-full p-4 md:p-8 bg-zinc-950/40" 
+    : cn("min-h-screen flex items-center justify-center p-6 bg-[#0A0A0B]", theme === 'light' && "bg-zinc-50");
+
+  return (
+    <div className={containerStyles}>
+      {!embedded && (
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-indigo-500/10 blur-[120px] rounded-full animate-pulse" />
+          <div className="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] bg-emerald-500/5 blur-[120px] rounded-full animate-pulse delay-1000" />
+        </div>
+      )}
+
+      <motion.div 
+        initial={embedded ? {} : { opacity: 0, y: 20 }}
+        animate={embedded ? {} : { opacity: 1, y: 0 }}
+        className={cn(
+          "relative w-full max-w-md p-8 md:p-10 bg-zinc-900/40 backdrop-blur-3xl border border-white/5 rounded-[2.5rem] shadow-2xl overflow-hidden",
+          theme === 'light' && "bg-white/80 border-zinc-200",
+          embedded && "shadow-none border-none bg-transparent p-0 md:p-0"
+        )}
+      >
+        {!embedded && <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-500 to-indigo-500" />}
+        
+        <div className="text-center mb-8">
+          {!embedded && (
+            <div className="w-14 h-14 bg-emerald-500/10 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-emerald-500/20">
+              <TrendingUp className="w-7 h-7 text-emerald-400" />
+            </div>
+          )}
+          <h1 className={cn("text-3xl font-black text-white tracking-tighter mb-1", theme === 'light' && "text-zinc-900", embedded && "text-xl")}>
+            ZY<span className="text-emerald-400">NC</span>
+          </h1>
+          <p className="text-zinc-500 text-[10px] font-black uppercase tracking-widest">
+            {isSignUp ? 'Initialize Institutional Archive' : 'Secure Entry Point'}
+          </p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 mb-6">
+          <button
+            onClick={() => handleSocialLogin('google')}
+            disabled={loading}
+            className="flex items-center justify-center gap-2 py-3 bg-white/5 hover:bg-white/10 border border-white/5 rounded-2xl text-[10px] font-black text-white uppercase tracking-widest transition-all hover:scale-[1.02] active:scale-[0.98]"
+          >
+            <Chrome className="w-3.5 h-3.5 text-rose-400" />
+            Google
+          </button>
+          <button
+            onClick={() => handleSocialLogin('apple')}
+            disabled={loading}
+            className="flex items-center justify-center gap-2 py-3 bg-white/5 hover:bg-white/10 border border-white/5 rounded-2xl text-[10px] font-black text-white uppercase tracking-widest transition-all hover:scale-[1.02] active:scale-[0.98]"
+          >
+            <Apple className="w-3.5 h-3.5" />
+            iCloud
+          </button>
+        </div>
+
+        <div className="relative mb-6">
+          <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/5"></div></div>
+          <div className="relative flex justify-center text-[8px] uppercase font-black text-zinc-600 tracking-[0.3em] bg-transparent">
+            <span className="px-3 bg-[#0D0D0E]">Or with encrypted mail</span>
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-3">
+          {isSignUp && (
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">Full Name</label>
+              <input
+                type="text"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                placeholder="John Profile"
+                required
+                className={cn(
+                  "w-full bg-zinc-950/50 border border-zinc-800 rounded-2xl px-6 py-4 text-sm text-white placeholder:text-zinc-700 outline-none focus:border-emerald-500/50 transition-all",
+                  theme === 'light' && "bg-white border-zinc-200 text-zinc-900"
+                )}
+              />
+            </div>
+          )}
+          
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">Email Address</label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="trader@market.com"
+              required
+              className={cn(
+                "w-full bg-zinc-950/50 border border-zinc-800 rounded-2xl px-6 py-4 text-sm text-white placeholder:text-zinc-700 outline-none focus:border-emerald-500/50 transition-all",
+                theme === 'light' && "bg-white border-zinc-200 text-zinc-900"
+              )}
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">Password</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              required
+              className={cn(
+                "w-full bg-zinc-950/50 border border-zinc-800 rounded-2xl px-6 py-4 text-sm text-white placeholder:text-zinc-700 outline-none focus:border-emerald-500/50 transition-all",
+                theme === 'light' && "bg-white border-zinc-200 text-zinc-900"
+              )}
+            />
+          </div>
+
+          {error && (
+            <p className="text-xs text-rose-400 text-center font-medium bg-rose-500/5 py-3 rounded-xl border border-rose-500/10">
+              {error}
+            </p>
+          )}
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-black font-black uppercase tracking-widest py-5 rounded-2xl transition-all shadow-xl shadow-emerald-500/10 active:scale-[0.98] mt-4"
+          >
+            {loading ? 'Processing...' : (isSignUp ? 'Initialize Vault' : 'Secure Entry')}
+          </button>
+        </form>
+
+        <div className="mt-8 text-center space-y-4">
+          <p className="text-xs text-zinc-500">
+            {isSignUp ? 'Already have a vault?' : 'New to private journaling?'}
+            <button
+              onClick={() => setIsSignUp(!isSignUp)}
+              className="ml-2 text-emerald-400 font-bold hover:text-emerald-300 transition-colors"
+            >
+              {isSignUp ? 'Access Vault' : 'Create Vault'}
+            </button>
+          </p>
+          
+          <div className="pt-6 border-t border-white/5 flex items-center justify-center gap-6">
+             <div className="flex items-center gap-1.5 text-[10px] text-zinc-600 uppercase font-black tracking-widest">
+                <Shield className="w-3 h-3 text-emerald-500" />
+                256-bit Encrypted
+             </div>
+             <div className="flex items-center gap-1.5 text-[10px] text-zinc-600 uppercase font-black tracking-widest">
+                <Lock className="w-3 h-3 text-indigo-400" />
+                Zero-Trust Data
+             </div>
+          </div>
+        </div>
+      </motion.div>
+    </div>
+  );
+};
+
 const NewsImpactDot = ({ impact }: { impact: NewsImpact }) => {
   const colors = {
     'Red': 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.6)]',
@@ -142,7 +392,11 @@ const HeroSection = ({ name, stats, onTabChange, onExport, hasTrades, currency, 
   currency: string,
   hidePnL: boolean
 }) => {
-  const displayValue = (val: number) => hidePnL ? '***' : formatCurrency(val, currency);
+  const displayValue = (val: number, showSign: boolean = false) => {
+    if (hidePnL) return '***';
+    const sign = showSign && val > 0 ? '+' : '';
+    return sign + formatCurrency(val, currency);
+  };
   
   return (
   <div className="relative overflow-hidden bg-zinc-900 border border-zinc-800 rounded-3xl p-8 mb-8">
@@ -794,7 +1048,11 @@ const Dashboard = ({ stats, trades, onTabChange, profileName, currency, hidePnL 
 const PnLCalendar = ({ trades, setSelectedTrade, currency, hidePnL }: { trades: Trade[], setSelectedTrade: (t: Trade) => void, currency: string, hidePnL: boolean }) => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   
-  const displayValue = (val: number) => hidePnL ? '***' : formatCurrency(val, currency);
+  const displayValue = (val: number, showSign: boolean = false) => {
+    if (hidePnL) return '***';
+    const sign = showSign && val > 0 ? '+' : '';
+    return sign + formatCurrency(val, currency);
+  };
 
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(monthStart);
@@ -807,7 +1065,7 @@ const PnLCalendar = ({ trades, setSelectedTrade, currency, hidePnL }: { trades: 
   const prevMonth = () => setCurrentMonth(subMonths(currentMonth, 1));
 
   return (
-    <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden shadow-2xl">
+    <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden shadow-2xl min-w-[700px]">
       <div className="px-6 py-5 border-b border-zinc-800 flex items-center justify-between bg-zinc-900/50">
         <div className="flex items-center gap-4">
           <h3 className="text-sm font-black text-white uppercase tracking-widest">{format(currentMonth, 'MMMM yyyy')}</h3>
@@ -910,6 +1168,13 @@ const TradeJournal = ({ trades, onAddTrade, onUpdateTrade, onDeleteTrade, settin
   const [newRuleInput, setNewRuleInput] = useState('');
 
   const currency = settings.currency;
+  const hidePnL = settings.hidePnL;
+
+  const displayValue = (val: number, showSign: boolean = false) => {
+    if (hidePnL) return '***';
+    const sign = showSign && val > 0 ? '+' : '';
+    return sign + formatCurrency(val, currency);
+  };
 
   const handleAddRule = () => {
     if (newRuleInput.trim()) {
@@ -1095,12 +1360,12 @@ const TradeJournal = ({ trades, onAddTrade, onUpdateTrade, onDeleteTrade, settin
                         {trade.strategy}
                       </td>
                       <td className="px-6 py-5">
-                        <div className="flex gap-1">
-                          {[...Array(Math.floor(trade.confidence / 2))].map((_, i) => (
-                            <div key={i} className="w-1.5 h-3 bg-indigo-500/50 rounded-full" />
-                          ))}
-                          {trade.confidence === 0 && <span className="text-zinc-700 uppercase font-black text-[8px]">Low</span>}
-                        </div>
+                <div className="flex gap-1">
+                  {[...Array(Math.max(0, Math.floor((trade.confidence || 0) / 2)))].map((_, i) => (
+                    <div key={i} className="w-1.5 h-3 bg-indigo-500/50 rounded-full" />
+                  ))}
+                  {(trade.confidence || 0) <= 2 && <span className="text-zinc-700 uppercase font-black text-[8px]">Low</span>}
+                </div>
                       </td>
                       <td className="px-6 py-5">
                         <NewsImpactDot impact={trade.newsImpact || 'None'} />
@@ -1140,6 +1405,7 @@ const TradeJournal = ({ trades, onAddTrade, onUpdateTrade, onDeleteTrade, settin
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.99 }}
               transition={{ duration: 0.2 }}
+              className="overflow-x-auto custom-scrollbar"
             >
               <PnLCalendar trades={filteredTrades} setSelectedTrade={setSelectedTrade} currency={currency} hidePnL={hidePnL} />
             </motion.div>
@@ -1296,33 +1562,33 @@ const TradeJournal = ({ trades, onAddTrade, onUpdateTrade, onDeleteTrade, settin
                 const side = formData.get('side') as Side;
                 
                 const pnl = isManualPnl 
-                  ? Number(formData.get('manualPnl'))
+                  ? (Number(formData.get('manualPnl')) || 0)
                   : (side === 'Long' 
                     ? (exitPrice - entryPrice) * posSize 
                     : (entryPrice - exitPrice) * posSize);
 
                 const pnlPercentage = isManualPnl 
-                  ? (pnl / (settings.startingBalance || 10000)) * 100 // Approximation vs balance if manual
-                  : (pnl / (entryPrice * posSize)) * 100;
+                  ? (pnl / (settings.startingBalance || 10000)) * 100 
+                  : ((entryPrice * posSize) !== 0 ? (pnl / (entryPrice * posSize)) * 100 : 0);
 
                 const tradeData: Partial<Trade> = {
-                  asset: formData.get('asset') as string,
-                  marketType: formData.get('marketType') as MarketType,
-                  entryPrice,
-                  exitPrice,
-                  positionSize: posSize,
-                  side,
-                  strategy: formData.get('strategy') as string,
-                  notes: formData.get('notes') as string,
-                  emotionalState: formData.get('emotionalState') as EmotionalState,
-                  confidence: Number(formData.get('confidence')),
-                  newsImpact: formData.get('newsImpact') as NewsImpact,
+                  asset: (formData.get('asset') as string) || 'Unknown',
+                  marketType: (formData.get('marketType') as MarketType) || 'Crypto',
+                  entryPrice: entryPrice || 0,
+                  exitPrice: exitPrice || 0,
+                  positionSize: posSize || 0,
+                  side: side || 'Long',
+                  strategy: (formData.get('strategy') as string) || 'Unspecified',
+                  notes: (formData.get('notes') as string) || '',
+                  emotionalState: (formData.get('emotionalState') as EmotionalState) || 'Neutral',
+                  confidence: Number(formData.get('confidence')) || 5,
+                  newsImpact: (formData.get('newsImpact') as NewsImpact) || 'None',
                   followedRules: formData.getAll('rules') as string[],
-                  exitStatus: formData.get('exitStatus') as ExitStatus,
-                  riskReward: Number(formData.get('riskReward')),
-                  targetRR: Number(formData.get('targetRR')),
-                  pnl,
-                  pnlPercentage
+                  exitStatus: (formData.get('exitStatus') as ExitStatus) || 'Closed Manually',
+                  riskReward: Number(formData.get('riskReward')) || 0,
+                  targetRR: Number(formData.get('targetRR')) || 0,
+                  pnl: pnl || 0,
+                  pnlPercentage: pnlPercentage || 0
                 };
 
                 if (editingTrade) {
@@ -1991,7 +2257,10 @@ const Settings = ({
   currentAccountId,
   onAddAccount,
   onSwitchAccount,
-  onDeleteAccount
+  onDeleteAccount,
+  user,
+  onAuthComplete,
+  onLogout
 }: { 
   settings: UserSettings, 
   onUpdateSettings: (s: UserSettings) => void,
@@ -1999,12 +2268,49 @@ const Settings = ({
   currentAccountId: string,
   onAddAccount: () => void,
   onSwitchAccount: (id: string) => void,
-  onDeleteAccount: (id: string) => void
+  onDeleteAccount: (id: string) => void,
+  user: User | null,
+  onAuthComplete: (u: User) => void,
+  onLogout: () => void
 }) => {
   const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   return (
     <div className="max-w-2xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      {/* Cloud Sync & Security Section */}
+      <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-xl shadow-xl relative overflow-hidden flex flex-col items-center text-center">
+        <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-indigo-500/5 blur-[80px] rounded-full" />
+        <h3 className="text-xl font-bold text-zinc-100 mb-2 font-serif tracking-tight flex items-center justify-center gap-2">
+          <Shield className="w-5 h-5 text-emerald-400" />
+          Cloud Sync & Security
+        </h3>
+        <p className="text-xs text-zinc-500 mb-8 max-w-sm mx-auto">Connect your vault to ZYNC's decentralized servers for real-time backup and private cross-device access.</p>
+        
+        {!user ? (
+          <div className="p-1 bg-zinc-950 border border-zinc-800 rounded-[2rem] overflow-hidden w-full max-w-sm">
+             <AuthPage onAuthComplete={onAuthComplete} theme="night" embedded />
+          </div>
+        ) : (
+          <div className="p-6 bg-zinc-950/50 border border-emerald-500/10 rounded-2xl flex items-center justify-between w-full">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
+                <TrendingUp className="w-6 h-6 text-emerald-400" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-white">{user.displayName}</p>
+                <p className="text-[10px] text-zinc-500 uppercase tracking-widest">{user.email}</p>
+              </div>
+            </div>
+            <button 
+              onClick={onLogout}
+              className="px-6 py-2 bg-rose-500/10 text-rose-400 border border-rose-500/20 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-rose-500 hover:text-white transition-all"
+            >
+              Disconnect
+            </button>
+          </div>
+        )}
+      </div>
+
       <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-xl shadow-xl">
         <h3 className="text-xl font-bold text-zinc-100 mb-6 font-serif tracking-tight">General Settings</h3>
         <div className="space-y-6">
@@ -2362,6 +2668,17 @@ const Execution = ({ trades, onUpdateTrade, currency, hidePnL }: { trades: Trade
     return sign + formatCurrency(val, currency);
   };
 
+  const handleImageUpload = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const result = e.target?.result as string;
+      if (selectedTrade) {
+        onUpdateTrade(selectedTrade.id, { executionImage: result });
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="flex justify-between items-center">
@@ -2405,15 +2722,38 @@ const Execution = ({ trades, onUpdateTrade, currency, hidePnL }: { trades: Trade
         <div className="lg:col-span-3 space-y-6">
           {selectedTrade ? (
             <div className="space-y-6">
-              <div className="relative aspect-video bg-zinc-950 rounded-3xl border border-zinc-800 overflow-hidden group">
+              <div 
+                className="relative aspect-video bg-zinc-950 rounded-3xl border border-zinc-800 overflow-hidden group outline-none focus:ring-2 focus:ring-indigo-500/20"
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const file = e.dataTransfer.files?.[0];
+                  if (file && file.type.startsWith('image/')) {
+                    handleImageUpload(file);
+                  }
+                }}
+                onPaste={(e) => {
+                  const item = e.clipboardData.items[0];
+                  if (item?.type.startsWith('image/')) {
+                    const file = item.getAsFile();
+                    if (file) handleImageUpload(file);
+                  }
+                }}
+                tabIndex={0}
+              >
                 {selectedTrade.executionImage ? (
                   <img src={selectedTrade.executionImage} alt="Chart Execution" className="w-full h-full object-cover" />
                 ) : (
                   <div className="flex flex-col items-center justify-center h-full gap-4 text-zinc-600">
                     <History className="w-12 h-12 opacity-20" />
-                    <div className="text-center">
-                      <p className="text-sm font-medium">No execution image imported</p>
-                      <p className="text-[10px] uppercase tracking-widest mt-1 opacity-50">Provide an image URL in the notes or upload below</p>
+                    <div className="text-center px-4">
+                      <p className="text-sm font-medium text-zinc-400">No execution image imported</p>
+                      <p className="text-[10px] uppercase tracking-[0.2em] mt-2 opacity-50">Drag & Drop or Paste an image anywhere here</p>
+                      <p className="text-[9px] text-zinc-700 mt-4 italic">Or enter a URL below</p>
                     </div>
                   </div>
                 )}
@@ -2501,6 +2841,7 @@ const CURRENCY_RATES: Record<string, number> = {
 };
 
 export default function App() {
+  const [user, setUser] = useState<User | null>(null);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
@@ -2537,7 +2878,14 @@ export default function App() {
     [accounts, currentAccountId]
   );
 
-  // Sync settings and trades with current account
+  const handleAuthComplete = (newUser: User) => {
+    setUser(newUser);
+  };
+
+  const handleLogout = () => {
+    setUser(null);
+  };
+
   useEffect(() => {
     setSettings(currentAccount.settings);
     setTrades(currentAccount.trades);
@@ -2680,7 +3028,7 @@ export default function App() {
 
   return (
     <div className={cn(
-      "flex flex-col h-screen h-screen font-sans overflow-hidden transition-colors duration-500",
+      "flex flex-col h-screen font-sans overflow-hidden transition-colors duration-500",
       settings.theme === 'light' ? "light bg-zinc-50 text-zinc-900" : "bg-[#0A0A0B] text-zinc-200"
     )}>
       {/* Liquid Glass Header */}
@@ -2763,6 +3111,19 @@ export default function App() {
               {settings.profileName.split(' ').map(n => n[0]).join('')}
             </div>
           </div>
+          <button
+            onClick={() => {
+              setActiveTab('settings');
+              handleLogout();
+            }}
+            className={cn(
+              "p-2 rounded-xl border flex items-center justify-center transition-all hover:bg-rose-500 hover:text-white group",
+              settings.theme === 'light' ? "bg-white border-zinc-200 text-zinc-500" : "bg-zinc-900 border-white/5 text-zinc-400"
+            )}
+            title="Log Out"
+          >
+            <LogOut className="w-4 h-4" />
+          </button>
         </div>
       </header>
 
@@ -2865,6 +3226,9 @@ export default function App() {
                     onAddAccount={handleAddAccount}
                     onSwitchAccount={handleSwitchAccount}
                     onDeleteAccount={handleDeleteAccount}
+                    user={user}
+                    onAuthComplete={handleAuthComplete}
+                    onLogout={handleLogout}
                   />
                 )}
               </motion.div>
@@ -2890,6 +3254,7 @@ export default function App() {
           </LegalModal>
         )}
       </AnimatePresence>
+      <GlowingCursor />
     </div>
   );
 }

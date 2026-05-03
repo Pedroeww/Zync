@@ -49,6 +49,12 @@ export interface Account {
   trades: Trade[];
 }
 
+export interface User {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+}
+
 export interface DashboardStats {
   totalPnL: number;
   winRate: number;
