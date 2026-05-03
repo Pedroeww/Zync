@@ -832,7 +832,7 @@ const ExportModal = ({ trades, profileName, onClose, currency, hidePnL }: { trad
 
                 <div className="pt-20 border-t border-zinc-900">
                   <p className="text-zinc-600 font-black uppercase tracking-[0.5em] text-sm mb-6 text-center">Net Performance</p>
-                  <p className="text-[180px] font-black text-center leading-none tracking-tighter text-white drop-shadow-2xl">
+                  <p className="text-[120px] font-black text-center leading-none tracking-tighter text-white drop-shadow-2xl px-10 truncate">
                     {displayValue(stats.totalPnL)}
                   </p>
                 </div>
@@ -2661,6 +2661,7 @@ const Plan = ({ name, rules }: { name: string, rules: string[] }) => {
 const Execution = ({ trades, onUpdateTrade, currency, hidePnL }: { trades: Trade[], onUpdateTrade: (id: string, updates: Partial<Trade>) => void, currency: string, hidePnL: boolean }) => {
   const [selectedTradeId, setSelectedTradeId] = useState<string | null>(trades[0]?.id || null);
   const selectedTrade = trades.find(t => t.id === selectedTradeId);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const displayValue = (val: number, showSign: boolean = false) => {
     if (hidePnL) return '***';
@@ -2669,11 +2670,26 @@ const Execution = ({ trades, onUpdateTrade, currency, hidePnL }: { trades: Trade
   };
 
   const handleImageUpload = (file: File) => {
+    if (!file.type.startsWith('image/')) return;
+    
+    // Limit file size to 2MB to prevent localStorage issues
+    if (file.size > 2 * 1024 * 1024) {
+      alert('Image is too large. Please use a file smaller than 2MB.');
+      return;
+    }
+
     const reader = new FileReader();
+    reader.onerror = () => {
+      console.error('FileReader error');
+    };
     reader.onload = (e) => {
-      const result = e.target?.result as string;
-      if (selectedTrade) {
-        onUpdateTrade(selectedTrade.id, { executionImage: result });
+      try {
+        const result = e.target?.result as string;
+        if (selectedTrade && result) {
+          onUpdateTrade(selectedTrade.id, { executionImage: result });
+        }
+      } catch (err) {
+        console.error('Failed to update trade with image:', err);
       }
     };
     reader.readAsDataURL(file);
@@ -2723,7 +2739,7 @@ const Execution = ({ trades, onUpdateTrade, currency, hidePnL }: { trades: Trade
           {selectedTrade ? (
             <div className="space-y-6">
               <div 
-                className="relative aspect-video bg-zinc-950 rounded-3xl border border-zinc-800 overflow-hidden group outline-none focus:ring-2 focus:ring-indigo-500/20"
+                className="relative aspect-video bg-zinc-950 rounded-3xl border border-zinc-800 overflow-hidden group outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer"
                 onDragOver={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
@@ -2743,27 +2759,64 @@ const Execution = ({ trades, onUpdateTrade, currency, hidePnL }: { trades: Trade
                     if (file) handleImageUpload(file);
                   }
                 }}
+                onClick={() => {
+                  if (!selectedTrade.executionImage) {
+                    fileInputRef.current?.click();
+                  }
+                }}
                 tabIndex={0}
               >
+                <input 
+                  type="file" 
+                  ref={fileInputRef} 
+                  className="hidden" 
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleImageUpload(file);
+                  }}
+                />
                 {selectedTrade.executionImage ? (
                   <img src={selectedTrade.executionImage} alt="Chart Execution" className="w-full h-full object-cover" />
                 ) : (
                   <div className="flex flex-col items-center justify-center h-full gap-4 text-zinc-600">
-                    <History className="w-12 h-12 opacity-20" />
+                    <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center border border-white/5 mb-2">
+                       <History className="w-10 h-10 opacity-40 text-emerald-400" />
+                    </div>
                     <div className="text-center px-4">
-                      <p className="text-sm font-medium text-zinc-400">No execution image imported</p>
-                      <p className="text-[10px] uppercase tracking-[0.2em] mt-2 opacity-50">Drag & Drop or Paste an image anywhere here</p>
-                      <p className="text-[9px] text-zinc-700 mt-4 italic">Or enter a URL below</p>
+                      <p className="text-lg font-black text-white tracking-tighter">Journal Your Charts</p>
+                      <p className="text-[10px] uppercase tracking-[0.2em] mt-2 text-zinc-500 font-black">Drop, Paste or Click to select image</p>
                     </div>
                   </div>
                 )}
                 
-                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-8 backdrop-blur-sm">
+                <div className="absolute inset-0 bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center p-8 backdrop-blur-md">
+                   <div className="flex gap-4 mb-8">
+                     <button 
+                       onClick={(e) => {
+                         e.stopPropagation();
+                         fileInputRef.current?.click();
+                       }}
+                       className="px-6 py-3 bg-emerald-500 text-black text-[10px] font-black uppercase tracking-widest rounded-xl hover:scale-105 active:scale-95 transition-all"
+                     >
+                       Change Image
+                     </button>
+                     <button 
+                       onClick={(e) => {
+                         e.stopPropagation();
+                         onUpdateTrade(selectedTrade.id, { executionImage: '' });
+                       }}
+                       className="px-6 py-3 bg-rose-500/10 text-rose-500 border border-rose-500/20 text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-rose-500 hover:text-white transition-all"
+                     >
+                       Remove
+                     </button>
+                   </div>
                   <div className="w-full max-w-sm">
                     <input 
                       type="text" 
-                      placeholder="Enter Image URL (e.g. TradingView link)"
+                      placeholder="Or enter Image URL..."
                       defaultValue={selectedTrade.executionImage || ''}
+                      onClick={(e) => e.stopPropagation()}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') {
                           onUpdateTrade(selectedTrade.id, { executionImage: (e.target as HTMLInputElement).value });
@@ -2791,8 +2844,8 @@ const Execution = ({ trades, onUpdateTrade, currency, hidePnL }: { trades: Trade
                 </div>
                 <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-2xl">
                   <p className="text-[8px] text-zinc-500 uppercase tracking-widest mb-1">Outcome</p>
-                  <p className={cn("text-xs font-black", selectedTrade.pnl >= 0 ? "text-emerald-400" : "text-rose-400")}>
-                    {displayValue(selectedTrade.pnl)} ({selectedTrade.pnlPercentage.toFixed(2)}%)
+                  <p className={cn("text-xs font-black", (selectedTrade.pnl || 0) >= 0 ? "text-emerald-400" : "text-rose-400")}>
+                    {displayValue(selectedTrade.pnl)} ({(selectedTrade.pnlPercentage || 0).toFixed(2)}%)
                   </p>
                 </div>
               </div>
@@ -2981,10 +3034,18 @@ export default function App() {
 
   // Save to LocalStorage
   useEffect(() => {
-    // We update the active account in the accounts array before saving
-    const updatedAccounts = accounts.map(a => a.id === currentAccountId ? { ...a, settings, trades } : a);
-    localStorage.setItem('zync_accounts', JSON.stringify(updatedAccounts));
-    localStorage.setItem('zync_current_account_id', currentAccountId);
+    try {
+      // We update the active account in the accounts array before saving
+      const updatedAccounts = accounts.map(a => a.id === currentAccountId ? { ...a, settings, trades } : a);
+      const accountsJson = JSON.stringify(updatedAccounts);
+      const accountId = currentAccountId;
+      
+      localStorage.setItem('zync_accounts', accountsJson);
+      localStorage.setItem('zync_current_account_id', accountId);
+    } catch (error) {
+      console.warn('Failed to save to localStorage (possibly quota exceeded):', error);
+      // Don't crash the app, just log a warning
+    }
   }, [trades, settings, currentAccountId, accounts]);
 
   const stats = useMemo<DashboardStats>(() => {
