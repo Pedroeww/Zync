@@ -174,22 +174,45 @@ const AuthPage = ({ onAuthComplete, theme, embedded = false }: AuthPageProps) =>
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  const handleSocialLogin = async (provider: 'google' | 'apple') => {
+  const handleGoogleLogin = async () => {
     setLoading(true);
     setError(null);
     setSuccessMessage(null);
     try {
       const { error } = await supabase.auth.signInWithOAuth({
-        provider: provider === 'google' ? 'google' : 'apple',
+        provider: 'google',
         options: {
           redirectTo: window.location.origin,
         },
       });
       if (error) throw error;
     } catch (err: any) {
-      setError(err.message || `Failed to connect with ${provider}`);
+      setError(err.message || 'Failed to connect with Google');
       setLoading(false);
     }
+  };
+
+  const handleAppleLogin = async () => {
+    setLoading(true);
+    setError(null);
+    setSuccessMessage(null);
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'apple',
+        options: {
+          redirectTo: window.location.origin,
+        },
+      });
+      if (error) throw error;
+    } catch (err: any) {
+      setError(err.message || 'Failed to connect with Apple');
+      setLoading(false);
+    }
+  };
+
+  const handleSocialLogin = async (provider: 'google' | 'apple') => {
+    if (provider === 'google') return handleGoogleLogin();
+    if (provider === 'apple') return handleAppleLogin();
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -296,20 +319,20 @@ const AuthPage = ({ onAuthComplete, theme, embedded = false }: AuthPageProps) =>
 
         <div className="grid grid-cols-2 gap-3 mb-6">
           <button
-            onClick={() => handleSocialLogin('google')}
+            onClick={handleGoogleLogin}
             disabled={loading}
             className="flex items-center justify-center gap-2 py-3 bg-white/5 hover:bg-white/10 border border-white/5 rounded-2xl text-[10px] font-black text-white uppercase tracking-widest transition-all hover:scale-[1.02] active:scale-[0.98]"
           >
             <Chrome className="w-3.5 h-3.5 text-rose-400" />
-            Google
+            Continue with Google
           </button>
           <button
-            onClick={() => handleSocialLogin('apple')}
+            onClick={handleAppleLogin}
             disabled={loading}
             className="flex items-center justify-center gap-2 py-3 bg-white/5 hover:bg-white/10 border border-white/5 rounded-2xl text-[10px] font-black text-white uppercase tracking-widest transition-all hover:scale-[1.02] active:scale-[0.98]"
           >
             <Apple className="w-3.5 h-3.5" />
-            iCloud
+            Continue with Apple
           </button>
         </div>
 
