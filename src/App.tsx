@@ -29,6 +29,7 @@ import {
   ChevronLeft,
   Filter,
   Calendar,
+  Maximize,
   ChevronDown,
   Mail,
   Instagram,
@@ -959,7 +960,7 @@ const StatsCard = ({ label, value, subValue, trend, icon: Icon, type = 'normal' 
 
 // --- Pages ---
 
-const Dashboard = ({ stats, trades, onTabChange, profileName, currency, hidePnL, user, onUpdateTrade }: { stats: DashboardStats, trades: Trade[], onTabChange: (tab: string) => void, profileName: string, currency: string, hidePnL: boolean, user: User | null, onUpdateTrade: (id: string, updates: Partial<Trade>) => void }) => {
+const Dashboard = ({ stats, trades, onTabChange, profileName, currency, hidePnL, user, onUpdateTrade, startingBalance }: { stats: DashboardStats, trades: Trade[], onTabChange: (tab: string) => void, profileName: string, currency: string, hidePnL: boolean, user: User | null, onUpdateTrade: (id: string, updates: Partial<Trade>) => void, startingBalance: number }) => {
   const [showExportModal, setShowExportModal] = useState(false);
   const [selectedRange, setSelectedRange] = useState('All Time');
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
@@ -1000,7 +1001,7 @@ const Dashboard = ({ stats, trades, onTabChange, profileName, currency, hidePnL,
     return sign + formatCurrency(val, currency);
   };
   const equityData = useMemo(() => {
-    let balance = 10000; // Starting
+    let balance = startingBalance;
     const sortedAsc = [...trades].sort((a, b) => new Date(a.entryDate).getTime() - new Date(b.entryDate).getTime());
     return sortedAsc.map(t => {
       balance += t.pnl;
@@ -1274,6 +1275,7 @@ const TradeJournal = ({ trades, onAddTrade, onUpdateTrade, onDeleteTrade, settin
   const [isUploadingDetail, setIsUploadingDetail] = useState(false);
   const [entryDate, setEntryDate] = useState<string>(new Date().toISOString());
   const [exitDate, setExitDate] = useState<string>(new Date().toISOString());
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   useEffect(() => {
     const resolve = async () => {
@@ -1708,7 +1710,13 @@ const TradeJournal = ({ trades, onAddTrade, onUpdateTrade, onDeleteTrade, settin
                  <span className="text-[10px] text-zinc-500 uppercase tracking-widest block mb-2">Trade Chart</span>
                  <div 
                    className="aspect-video bg-zinc-950 rounded-2xl border border-zinc-800 border-dashed flex flex-col items-center justify-center gap-3 group/chart cursor-pointer hover:bg-zinc-900 transition-all overflow-hidden relative"
-                   onClick={() => fileInputRefDetail.current?.click()}
+                   onClick={() => {
+                     if (selectedTrade.screenshot) {
+                       setIsFullscreen(true);
+                     } else {
+                       fileInputRefDetail.current?.click();
+                     }
+                   }}
                  >
                     <input 
                       type="file" 
@@ -1723,8 +1731,25 @@ const TradeJournal = ({ trades, onAddTrade, onUpdateTrade, onDeleteTrade, settin
                     {selectedTrade.screenshot ? (
                       <>
                         <img src={selectedTrade.screenshot} alt="Trade Chart" className="w-full h-full object-cover" />
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/chart:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
-                          <p className="text-[10px] font-black uppercase text-white tracking-widest">Change Image</p>
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/chart:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm gap-2">
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setIsFullscreen(true);
+                            }}
+                            className="p-2 bg-white text-black rounded-lg hover:scale-110 transition-transform"
+                          >
+                            <Maximize className="w-4 h-4" />
+                          </button>
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              fileInputRefDetail.current?.click();
+                            }}
+                            className="p-2 bg-emerald-500 text-black rounded-lg hover:scale-110 transition-transform"
+                          >
+                            <Plus className="w-4 h-4" />
+                          </button>
                         </div>
                       </>
                     ) : (
@@ -1741,6 +1766,41 @@ const TradeJournal = ({ trades, onAddTrade, onUpdateTrade, onDeleteTrade, settin
               </div>
             </motion.div>
           </div>
+        )}
+      </AnimatePresence>
+
+      {/* Fullscreen Overlay for Journals */}
+      <AnimatePresence>
+        {isFullscreen && selectedTrade?.screenshot && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-2xl flex items-center justify-center p-4 md:p-12"
+            onClick={() => setIsFullscreen(false)}
+          >
+            <button 
+              onClick={() => setIsFullscreen(false)}
+              className="absolute top-8 right-8 p-4 bg-white/5 hover:bg-white/10 rounded-full text-white transition-all z-10"
+            >
+              <X className="w-6 h-6" />
+            </button>
+            
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              className="relative w-full h-full flex items-center justify-center"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <img 
+                src={selectedTrade.screenshot} 
+                alt="Full trade view" 
+                className="max-w-full max-h-full object-contain rounded-lg shadow-2xl shadow-indigo-500/10"
+              />
+            </motion.div>
+          </motion.div>
         )}
       </AnimatePresence>
 
@@ -2164,6 +2224,7 @@ const Analytics = ({ trades, currency, hidePnL, user, onUpdateTrade }: { trades:
   const [selectedTrade, setSelectedTrade] = useState<Trade | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const handleScreenshotUpload = async (file: File) => {
     if (!selectedTrade || !user || !file.type.startsWith('image/')) return;
@@ -2527,7 +2588,13 @@ const Analytics = ({ trades, currency, hidePnL, user, onUpdateTrade }: { trades:
                  <span className="text-[10px] text-zinc-500 uppercase tracking-widest block mb-2">Trade Chart</span>
                  <div 
                    className="aspect-video bg-zinc-950 rounded-2xl border border-zinc-800 border-dashed flex flex-col items-center justify-center gap-3 group/chart cursor-pointer hover:bg-zinc-900 transition-all overflow-hidden relative"
-                   onClick={() => fileInputRef.current?.click()}
+                   onClick={() => {
+                     if (selectedTrade.screenshot) {
+                       setIsFullscreen(true);
+                     } else {
+                       fileInputRef.current?.click();
+                     }
+                   }}
                  >
                     <input 
                       type="file" 
@@ -2542,8 +2609,25 @@ const Analytics = ({ trades, currency, hidePnL, user, onUpdateTrade }: { trades:
                     {selectedTrade.screenshot ? (
                       <>
                         <img src={selectedTrade.screenshot} alt="Trade Chart" className="w-full h-full object-cover" />
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/chart:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
-                          <p className="text-[10px] font-black uppercase text-white tracking-widest">Change Image</p>
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/chart:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm gap-2">
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setIsFullscreen(true);
+                            }}
+                            className="p-2 bg-white text-black rounded-lg hover:scale-110 transition-transform"
+                          >
+                            <Maximize className="w-4 h-4" />
+                          </button>
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              fileInputRef.current?.click();
+                            }}
+                            className="p-2 bg-emerald-500 text-black rounded-lg hover:scale-110 transition-transform"
+                          >
+                            <Plus className="w-4 h-4" />
+                          </button>
                         </div>
                       </>
                     ) : (
@@ -2560,6 +2644,40 @@ const Analytics = ({ trades, currency, hidePnL, user, onUpdateTrade }: { trades:
               </div>
             </motion.div>
           </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {isFullscreen && selectedTrade?.screenshot && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-2xl flex items-center justify-center p-4 md:p-12"
+            onClick={() => setIsFullscreen(false)}
+          >
+            <button 
+              onClick={() => setIsFullscreen(false)}
+              className="absolute top-8 right-8 p-4 bg-white/5 hover:bg-white/10 rounded-full text-white transition-all z-10"
+            >
+              <X className="w-6 h-6" />
+            </button>
+            
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              className="relative w-full h-full flex items-center justify-center"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <img 
+                src={selectedTrade.screenshot} 
+                alt="Full analytics chart" 
+                className="max-w-full max-h-full object-contain rounded-lg shadow-2xl shadow-indigo-500/10"
+              />
+            </motion.div>
+          </motion.div>
         )}
       </AnimatePresence>
 
@@ -2994,6 +3112,7 @@ const Execution = ({ trades, onUpdateTrade, currency, hidePnL, user }: { trades:
   const selectedTrade = trades.find(t => t.id === selectedTradeId);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const displayValue = (val: number, showSign: boolean = false) => {
     if (hidePnL) return '***';
@@ -3068,6 +3187,41 @@ const Execution = ({ trades, onUpdateTrade, currency, hidePnL, user }: { trades:
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+        {/* Fullscreen Overlay */}
+        <AnimatePresence>
+          {isFullscreen && (selectedTrade.executionImage || selectedTrade.screenshot) && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-2xl flex items-center justify-center p-4 md:p-12"
+              onClick={() => setIsFullscreen(false)}
+            >
+              <button 
+                onClick={() => setIsFullscreen(false)}
+                className="absolute top-8 right-8 p-4 bg-white/5 hover:bg-white/10 rounded-full text-white transition-all z-10"
+              >
+                <X className="w-6 h-6" />
+              </button>
+              
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                transition={{ type: "spring", damping: 25, stiffness: 300 }}
+                className="relative w-full h-full flex items-center justify-center"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <img 
+                  src={selectedTrade.executionImage || selectedTrade.screenshot} 
+                  alt="Full execution view" 
+                  className="max-w-full max-h-full object-contain rounded-lg shadow-2xl shadow-indigo-500/10"
+                />
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Sidebar - Trade List */}
         <div className="lg:col-span-1 space-y-2 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
           {trades.map(trade => (
@@ -3123,8 +3277,10 @@ const Execution = ({ trades, onUpdateTrade, currency, hidePnL, user }: { trades:
                   }
                 }}
                 onClick={() => {
-                  if (!selectedTrade.executionImage) {
+                  if (!selectedTrade.executionImage && !selectedTrade.screenshot) {
                     fileInputRef.current?.click();
+                  } else {
+                    setIsFullscreen(true);
                   }
                 }}
                 tabIndex={0}
@@ -3155,15 +3311,27 @@ const Execution = ({ trades, onUpdateTrade, currency, hidePnL, user }: { trades:
                 
                 <div className="absolute inset-0 bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center p-8 backdrop-blur-md">
                    <div className="flex gap-4 mb-8">
-                     <button 
-                       onClick={(e) => {
-                         e.stopPropagation();
-                         fileInputRef.current?.click();
-                       }}
-                       className="px-6 py-3 bg-emerald-500 text-black text-[10px] font-black uppercase tracking-widest rounded-xl hover:scale-105 active:scale-95 transition-all"
-                     >
-                       Change Image
-                     </button>
+                    {(selectedTrade.executionImage || selectedTrade.screenshot) && (
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setIsFullscreen(true);
+                        }}
+                        className="px-6 py-3 bg-white text-black text-[10px] font-black uppercase tracking-widest rounded-xl hover:scale-105 active:scale-95 transition-all flex items-center gap-2"
+                      >
+                        <Maximize className="w-3 h-3" />
+                        Full Screen
+                      </button>
+                    )}
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        fileInputRef.current?.click();
+                      }}
+                      className="px-6 py-3 bg-emerald-500 text-black text-[10px] font-black uppercase tracking-widest rounded-xl hover:scale-105 active:scale-95 transition-all"
+                    >
+                      Change Image
+                    </button>
                      <button 
                        onClick={handleRemoveImage}
                        className="px-6 py-3 bg-rose-500/10 text-rose-500 border border-rose-500/20 text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-rose-500 hover:text-white transition-all"
@@ -3799,6 +3967,7 @@ export default function App() {
                     hidePnL={settings.hidePnL}
                     user={user}
                     onUpdateTrade={handleUpdateTrade}
+                    startingBalance={settings.startingBalance}
                   />
                 )}
                 {activeTab === 'journal' && (
