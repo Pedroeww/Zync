@@ -704,7 +704,7 @@ const ExportModal = ({ trades, profileName, onClose, currency, hidePnL, initialT
     } else if (rangeType === 'week') {
       selectedTrades = trades.filter(t => isWithinInterval(parseISO(t.exitDate || t.entryDate), { start: startOfWeek(now), end: endOfWeek(now) }));
     } else if (rangeType === 'month') {
-      selectedTrades = trades.filter(t => isWithinInterval(parseISO(t.exitDate || t.entryDate), { start: startOfMonth(now), end: endOfMonth(now) }));
+      selectedTrades = trades.filter(t => isWithinInterval(parseISO(t.exitDate || t.entryDate), { start: startOfMonth(currentMonth), end: endOfMonth(currentMonth) }));
     } else if (rangeType === 'ytd') {
       selectedTrades = trades.filter(t => isWithinInterval(parseISO(t.exitDate || t.entryDate), { start: startOfYear(now), end: now }));
     } else if (rangeType === 'custom') {
@@ -761,34 +761,45 @@ const ExportModal = ({ trades, profileName, onClose, currency, hidePnL, initialT
     const now = new Date();
 
     if (rangeType === 'day') {
-      selectedTrades = trades.filter(t => isSameDay(parseISO(t.entryDate), now));
+      selectedTrades = trades.filter(t => isSameDay(parseISO(t.exitDate || t.entryDate), now));
     } else if (rangeType === 'week') {
-      selectedTrades = trades.filter(t => isWithinInterval(parseISO(t.entryDate), { start: startOfWeek(now), end: endOfWeek(now) }));
+      selectedTrades = trades.filter(t => isWithinInterval(parseISO(t.exitDate || t.entryDate), { start: startOfWeek(now), end: endOfWeek(now) }));
     } else if (rangeType === 'month') {
-      selectedTrades = trades.filter(t => isWithinInterval(parseISO(t.entryDate), { start: startOfMonth(now), end: endOfMonth(now) }));
+      selectedTrades = trades.filter(t => isWithinInterval(parseISO(t.exitDate || t.entryDate), { start: startOfMonth(currentMonth), end: endOfMonth(currentMonth) }));
     } else if (rangeType === 'ytd') {
-      selectedTrades = trades.filter(t => isWithinInterval(parseISO(t.entryDate), { start: startOfYear(now), end: now }));
+      selectedTrades = trades.filter(t => isWithinInterval(parseISO(t.exitDate || t.entryDate), { start: startOfYear(now), end: now }));
+    } else if (rangeType === 'custom') {
+      selectedTrades = trades.filter(t => 
+        selectedDates.some(d => isSameDay(parseISO(t.exitDate || t.entryDate), d))
+      );
     } else if (rangeType === 'trade') {
       selectedTrades = trades.filter(t => t.id === selectedTradeId);
     }
 
     if (selectedTrades.length === 0) return;
 
-    const headers = ['Date', 'Asset', 'Side', 'Entry', 'Exit', 'P&L', 'P&L %', 'Strategy'];
+    const headers = ['Date', 'Asset', 'Side', 'Entry', 'Exit', 'P&L', 'P&L %', 'Strategy', 'Notes'];
     const rows = selectedTrades.map(t => [
-      t.entryDate,
+      format(parseISO(t.exitDate || t.entryDate), 'yyyy-MM-dd HH:mm'),
       t.asset,
       t.side,
       t.entryPrice,
       t.exitPrice,
-      t.pnl,
-      t.pnlPercentage,
-      t.strategy
+      t.pnl.toFixed(2),
+      t.pnlPercentage.toFixed(2),
+      t.strategy,
+      t.notes || ''
     ]);
 
+    // Better CSV escaping: wrap in quotes and escape internal quotes
+    const escape = (val: any) => {
+      const s = String(val).replace(/"/g, '""');
+      return `"${s}"`;
+    };
+
     const csvContent = [
-      headers.join(','),
-      ...rows.map(row => row.join(','))
+      headers.map(escape).join(','),
+      ...rows.map(row => row.map(escape).join(','))
     ].join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -1876,8 +1887,52 @@ const TradeJournal = ({ trades, onAddTrade, onUpdateTrade, onDeleteTrade, settin
                     )}
                  </div>
               </div>
+
+              <div className="mt-8 pt-6 border-t border-zinc-800 flex gap-2">
+                <button 
+                  onClick={() => setShowExportModal(true)}
+                  className="flex-1 py-3 bg-white text-black text-[10px] font-black uppercase tracking-widest rounded-xl hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-lg shadow-white/5"
+                >
+                  <CreditCard className="w-3 h-3" />
+                  Poster
+                </button>
+                <button 
+                  onClick={() => {
+                    setEditingTrade(selectedTrade);
+                    setSelectedTrade(null);
+                    setShowForm(true);
+                  }}
+                  className="p-3 bg-zinc-800 text-zinc-400 rounded-xl hover:bg-zinc-700 transition-all"
+                >
+                  <Edit2 className="w-3 h-3" />
+                </button>
+                <button 
+                  onClick={() => {
+                    if (window.confirm('Delete this trade?')) {
+                      onDeleteTrade(selectedTrade.id);
+                      setSelectedTrade(null);
+                    }
+                  }}
+                  className="p-3 bg-zinc-800 text-rose-500 rounded-xl hover:bg-rose-500/10 transition-all"
+                >
+                  <Trash2 className="w-3 h-3" />
+                </button>
+              </div>
             </motion.div>
           </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showExportModal && selectedTrade && (
+          <ExportModal 
+            trades={trades} 
+            profileName={settings.profileName} 
+            onClose={() => setShowExportModal(false)}
+            currency={settings.currency}
+            hidePnL={settings.hidePnL}
+            initialTradeId={selectedTrade.id}
+          />
         )}
       </AnimatePresence>
 
@@ -2332,8 +2387,9 @@ const TradeJournal = ({ trades, onAddTrade, onUpdateTrade, onDeleteTrade, settin
   );
 };
 
-const Analytics = ({ trades, currency, hidePnL, user, onUpdateTrade }: { trades: Trade[], currency: string, hidePnL: boolean, user: User | null, onUpdateTrade: (id: string, updates: Partial<Trade>) => void }) => {
+const Analytics = ({ trades, currency, hidePnL, user, profileName, onUpdateTrade }: { trades: Trade[], currency: string, hidePnL: boolean, user: User | null, profileName: string, onUpdateTrade: (id: string, updates: Partial<Trade>) => void }) => {
   const [selectedTrade, setSelectedTrade] = useState<Trade | null>(null);
+  const [showExportModal, setShowExportModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -2752,10 +2808,33 @@ const Analytics = ({ trades, currency, hidePnL, user, onUpdateTrade }: { trades:
                         </p>
                       </>
                     )}
-                 </div>
-              </div>
+                  </div>
+               </div>
+
+               <div className="mt-8 pt-6 border-t border-zinc-800 flex gap-2">
+                 <button 
+                   onClick={() => setShowExportModal(true)}
+                   className="flex-1 py-3 bg-white text-black text-[10px] font-black uppercase tracking-widest rounded-xl hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-lg shadow-white/5"
+                 >
+                   <CreditCard className="w-3 h-3" />
+                   Poster
+                 </button>
+               </div>
             </motion.div>
           </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showExportModal && selectedTrade && (
+          <ExportModal 
+            trades={trades} 
+            profileName={profileName} 
+            onClose={() => setShowExportModal(false)}
+            currency={currency}
+            hidePnL={hidePnL}
+            initialTradeId={selectedTrade.id}
+          />
         )}
       </AnimatePresence>
 
@@ -4095,7 +4174,7 @@ export default function App() {
                 )}
                 {activeTab === 'execution' && <Execution trades={sortedTrades} onUpdateTrade={handleUpdateTrade} currency={settings.currency} hidePnL={settings.hidePnL} user={user} />}
                 {activeTab === 'plan' && <Plan name={settings.profileName} rules={settings.strategyRules} />}
-                {activeTab === 'analytics' && <Analytics trades={sortedTrades} currency={settings.currency} hidePnL={settings.hidePnL} user={user} onUpdateTrade={handleUpdateTrade} />}
+                {activeTab === 'analytics' && <Analytics trades={sortedTrades} currency={settings.currency} hidePnL={settings.hidePnL} user={user} profileName={settings.profileName} onUpdateTrade={handleUpdateTrade} />}
                 {activeTab === 'settings' && (
                   <Settings 
                     settings={settings} 
