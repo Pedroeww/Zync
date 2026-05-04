@@ -1190,7 +1190,7 @@ const PnLCalendar = ({ trades, setSelectedTrade, currency, hidePnL }: { trades: 
 
       <div className="grid grid-cols-7">
         {calendarDays.map((day, idx) => {
-          const dayTrades = trades.filter(t => isSameDay(parseISO(t.entryDate), day));
+          const dayTrades = trades.filter(t => isSameDay(parseISO(t.exitDate), day));
           const dayPnL = dayTrades.reduce((acc, t) => acc + t.pnl, 0);
           const isCurrentMonth = isSameDay(startOfMonth(day), startOfMonth(currentMonth));
           const isToday = isSameDay(day, new Date());
@@ -2389,7 +2389,7 @@ const Analytics = ({ trades, currency, hidePnL, user, onUpdateTrade }: { trades:
           </div>
           <div className="flex flex-wrap gap-2">
             {eachDayOfInterval({ start: subDays(new Date(), 30), end: new Date() }).map((day, i) => {
-              const dayTrades = trades.filter(t => isSameDay(parseISO(t.entryDate), day));
+              const dayTrades = trades.filter(t => isSameDay(parseISO(t.exitDate), day));
               const pnl = dayTrades.reduce((acc, t) => acc + t.pnl, 0);
               return (
                 <div 
