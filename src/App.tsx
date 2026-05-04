@@ -1001,13 +1001,14 @@ const Dashboard = ({ stats, trades, onTabChange, profileName, currency, hidePnL,
   };
   const equityData = useMemo(() => {
     let balance = 10000; // Starting
-    return trades.map(t => {
+    const sortedAsc = [...trades].sort((a, b) => new Date(a.entryDate).getTime() - new Date(b.entryDate).getTime());
+    return sortedAsc.map(t => {
       balance += t.pnl;
       return {
         date: format(parseISO(t.entryDate), 'MMM dd'),
         balance
       };
-    }).reverse();
+    });
   }, [trades]);
 
   return (
@@ -1271,6 +1272,8 @@ const TradeJournal = ({ trades, onAddTrade, onUpdateTrade, onDeleteTrade, settin
   const fileInputRef = useRef<HTMLInputElement>(null);
   const fileInputRefDetail = useRef<HTMLInputElement>(null);
   const [isUploadingDetail, setIsUploadingDetail] = useState(false);
+  const [entryDate, setEntryDate] = useState<string>(new Date().toISOString());
+  const [exitDate, setExitDate] = useState<string>(new Date().toISOString());
 
   useEffect(() => {
     const resolve = async () => {
@@ -1319,9 +1322,10 @@ const TradeJournal = ({ trades, onAddTrade, onUpdateTrade, onDeleteTrade, settin
   };
 
   const filteredTrades = useMemo(() => {
-    if (filter === 'wins') return trades.filter(t => t.pnl >= 0);
-    if (filter === 'losses') return trades.filter(t => t.pnl < 0);
-    return trades;
+    let result = [...trades];
+    if (filter === 'wins') result = result.filter(t => t.pnl >= 0);
+    if (filter === 'losses') result = result.filter(t => t.pnl < 0);
+    return result.sort((a, b) => new Date(b.entryDate).getTime() - new Date(a.entryDate).getTime());
   }, [trades, filter]);
 
   const handleScreenshotUpload = async (file: File) => {
@@ -1387,6 +1391,8 @@ const TradeJournal = ({ trades, onAddTrade, onUpdateTrade, onDeleteTrade, settin
     setConfidence(trade.confidence);
     setIsManualPnl(true); 
     setScreenshot(trade.screenshot || null);
+    setEntryDate(trade.entryDate);
+    setExitDate(trade.exitDate);
     setShowForm(true);
   };
 
@@ -1395,6 +1401,8 @@ const TradeJournal = ({ trades, onAddTrade, onUpdateTrade, onDeleteTrade, settin
     setConfidence(5);
     setIsManualPnl(false);
     setScreenshot(null);
+    setEntryDate(new Date().toISOString());
+    setExitDate(new Date().toISOString());
     setShowForm(true);
   };
 
@@ -1797,7 +1805,9 @@ const TradeJournal = ({ trades, onAddTrade, onUpdateTrade, onDeleteTrade, settin
                   targetRR: Number(formData.get('targetRR')) || 0,
                   pnl: pnl || 0,
                   pnlPercentage: pnlPercentage || 0,
-                  screenshot: screenshot || undefined
+                  screenshot: screenshot || undefined,
+                  entryDate: new Date(formData.get('entryDate') as string).toISOString(),
+                  exitDate: new Date(formData.get('exitDate') as string).toISOString(),
                 };
 
                 if (editingTrade) {
@@ -1806,14 +1816,35 @@ const TradeJournal = ({ trades, onAddTrade, onUpdateTrade, onDeleteTrade, settin
                   const newTrade: Trade = {
                     ...tradeData as Trade,
                     id: Math.random().toString(36).substr(2, 9),
-                    entryDate: new Date().toISOString(),
-                    exitDate: new Date().toISOString(),
                     mistakeTags: [],
                   };
                   onAddTrade(newTrade);
                 }
                 setShowForm(false);
               }}>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">Entry Date & Time</label>
+                    <input 
+                      name="entryDate" 
+                      type="datetime-local"
+                      defaultValue={format(parseISO(entryDate), "yyyy-MM-dd'T'HH:mm")}
+                      required 
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-2 text-zinc-100 focus:ring-1 focus:ring-emerald-500 outline-none" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">Exit Date & Time</label>
+                    <input 
+                      name="exitDate" 
+                      type="datetime-local"
+                      defaultValue={format(parseISO(exitDate), "yyyy-MM-dd'T'HH:mm")}
+                      required 
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-2 text-zinc-100 focus:ring-1 focus:ring-emerald-500 outline-none" 
+                    />
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">Asset</label>
@@ -3497,6 +3528,10 @@ export default function App() {
     }
   }, [trades, settings, currentAccountId, accounts, user]);
 
+  const sortedTrades = useMemo(() => {
+    return [...trades].sort((a, b) => new Date(b.entryDate).getTime() - new Date(a.entryDate).getTime());
+  }, [trades]);
+
   const stats = useMemo<DashboardStats>(() => {
     const totalPnL = trades.reduce((acc, t) => acc + t.pnl, 0);
     const wins = trades.filter(t => t.pnl > 0);
@@ -3757,7 +3792,7 @@ export default function App() {
                 {activeTab === 'dashboard' && (
                   <Dashboard 
                     stats={stats} 
-                    trades={trades} 
+                    trades={sortedTrades} 
                     onTabChange={setActiveTab} 
                     profileName={settings.profileName} 
                     currency={settings.currency} 
@@ -3777,9 +3812,9 @@ export default function App() {
                     user={user}
                   />
                 )}
-                {activeTab === 'execution' && <Execution trades={trades} onUpdateTrade={handleUpdateTrade} currency={settings.currency} hidePnL={settings.hidePnL} user={user} />}
+                {activeTab === 'execution' && <Execution trades={sortedTrades} onUpdateTrade={handleUpdateTrade} currency={settings.currency} hidePnL={settings.hidePnL} user={user} />}
                 {activeTab === 'plan' && <Plan name={settings.profileName} rules={settings.strategyRules} />}
-                {activeTab === 'analytics' && <Analytics trades={trades} currency={settings.currency} hidePnL={settings.hidePnL} user={user} onUpdateTrade={handleUpdateTrade} />}
+                {activeTab === 'analytics' && <Analytics trades={sortedTrades} currency={settings.currency} hidePnL={settings.hidePnL} user={user} onUpdateTrade={handleUpdateTrade} />}
                 {activeTab === 'settings' && (
                   <Settings 
                     settings={settings} 
