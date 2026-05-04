@@ -16,6 +16,7 @@ import {
   Target,
   Trophy,
   Scale,
+  Cpu,
   Minus,
   AlertCircle,
   Menu as HamburgerIcon,
@@ -31,13 +32,16 @@ import {
   Calendar,
   Maximize,
   ChevronDown,
+  ChevronUp,
   Mail,
   Instagram,
   Shield,
   FileText,
   Lock,
   Chrome,
-  Apple
+  Apple,
+  CheckCircle2,
+  Zap
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -77,10 +81,22 @@ import {
 import { cn, formatCurrency, formatPercent } from './lib/utils';
 import { supabase } from './supabaseClient';
 import { dataService } from './services/dataService';
-import { Trade, UserSettings, DashboardStats, MarketType, Side, EmotionalState, NewsImpact, ExitStatus, Account, User } from './types';
+import { Trade, UserSettings, PlaybookItem, DashboardStats, MarketType, Side, EmotionalState, NewsImpact, ExitStatus, Account, User } from './types';
 import { MOCK_TRADES } from './constants';
 
 // --- Components ---
+
+const ScrollAnimatedSection = ({ children, className, delay = 0 }: { children: React.ReactNode, className?: string, delay?: number }) => (
+  <motion.div
+    initial={{ opacity: 0, y: 20 }}
+    whileInView={{ opacity: 1, y: 0 }}
+    viewport={{ once: true, margin: "-50px" }}
+    transition={{ duration: 0.6, delay, ease: [0.21, 0.47, 0.32, 0.98] }}
+    className={className}
+  >
+    {children}
+  </motion.div>
+);
 
 const GlowingCursor = () => {
   const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -1135,18 +1151,20 @@ const Dashboard = ({ stats, trades, onTabChange, profileName, currency, hidePnL,
   }, [trades]);
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
-        <HeroSection 
-          name={profileName} 
-          stats={stats} 
-          onTabChange={onTabChange} 
-          onExport={() => setShowExportModal(true)}
-          hasTrades={trades.length > 0}
-          currency={currency}
-          hidePnL={hidePnL}
-        />
+    <div className="space-y-8">
+        <ScrollAnimatedSection>
+          <HeroSection 
+            name={profileName} 
+            stats={stats} 
+            onTabChange={onTabChange} 
+            onExport={() => setShowExportModal(true)}
+            hasTrades={trades.length > 0}
+            currency={currency}
+            hidePnL={hidePnL}
+          />
+        </ScrollAnimatedSection>
         
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <ScrollAnimatedSection delay={0.1} className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <StatsCard 
             label="Total P&L" 
             value={displayValue(stats.totalPnL)} 
@@ -1168,14 +1186,14 @@ const Dashboard = ({ stats, trades, onTabChange, profileName, currency, hidePnL,
             value={displayValue((stats.avgWin + stats.avgLoss) / 2)} 
             subValue="Gross Avg"
           />
-        <StatsCard 
-          label="Total Trades" 
-          value={stats.totalTrades.toString()} 
-          subValue="Last 30 Days"
-        />
-      </div>
+          <StatsCard 
+            label="Total Trades" 
+            value={stats.totalTrades.toString()} 
+            subValue="Last 30 Days"
+          />
+        </ScrollAnimatedSection>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <ScrollAnimatedSection delay={0.2} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 bg-zinc-900 border border-zinc-800 p-5 rounded-xl">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-semibold">Equity Curve</h3>
@@ -1250,7 +1268,7 @@ const Dashboard = ({ stats, trades, onTabChange, profileName, currency, hidePnL,
             ))}
           </div>
         </div>
-      </div>
+      </ScrollAnimatedSection>
 
       <AnimatePresence>
         {showExportModal && (
@@ -1532,22 +1550,25 @@ const TradeJournal = ({ trades, onAddTrade, onUpdateTrade, onDeleteTrade, settin
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-3xl font-black text-white tracking-tighter">Trade Journal</h2>
-          <p className="text-zinc-500 text-sm">Documenting every market move for refinement.</p>
+    <div className="space-y-8">
+      <ScrollAnimatedSection>
+        <div className="flex justify-between items-center">
+          <div>
+            <h2 className="text-3xl font-black text-white tracking-tighter">Trade Journal</h2>
+            <p className="text-zinc-500 text-sm">Documenting every market move for refinement.</p>
+          </div>
+          <button 
+            onClick={handleNewEntry}
+            className="bg-emerald-500 hover:bg-emerald-400 text-black px-6 py-3 rounded-2xl font-black uppercase tracking-widest text-xs flex items-center gap-2 transition-all shadow-lg shadow-emerald-500/10 active:scale-95"
+          >
+            <Plus className="w-5 h-5" />
+            <span>New Entry</span>
+          </button>
         </div>
-        <button 
-          onClick={handleNewEntry}
-          className="bg-emerald-500 hover:bg-emerald-400 text-black px-6 py-3 rounded-2xl font-black uppercase tracking-widest text-xs flex items-center gap-2 transition-all shadow-lg shadow-emerald-500/10 active:scale-95"
-        >
-          <Plus className="w-5 h-5" />
-          <span>New Entry</span>
-        </button>
-      </div>
+      </ScrollAnimatedSection>
 
-      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-2xl">
+      <ScrollAnimatedSection delay={0.1}>
+        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-2xl">
         <div className="border-b border-zinc-800 bg-zinc-900/50">
           <div 
             className="px-6 py-4 flex items-center justify-between cursor-pointer hover:bg-zinc-800/30 transition-colors"
@@ -2383,6 +2404,7 @@ const TradeJournal = ({ trades, onAddTrade, onUpdateTrade, onDeleteTrade, settin
           </div>
         )}
       </AnimatePresence>
+      </ScrollAnimatedSection>
     </div>
   );
 };
@@ -2457,6 +2479,103 @@ const Analytics = ({ trades, currency, hidePnL, user, profileName, onUpdateTrade
 
   const COLORS = ['#10b981', '#f59e0b', '#3b82f6', '#8b5cf6', '#f43f5e'];
 
+  const sessionData = useMemo(() => {
+    const map = [
+      { name: 'Asian', pnl: 0, count: 0 },
+      { name: 'London', pnl: 0, count: 0 },
+      { name: 'New York', pnl: 0, count: 0 },
+    ];
+    
+    trades.forEach(t => {
+      const hour = parseISO(t.entryDate).getUTCHours();
+      if (hour >= 0 && hour < 8) {
+        map[0].pnl += t.pnl;
+        map[0].count++;
+      } else if (hour >= 8 && hour < 16) {
+        map[1].pnl += t.pnl;
+        map[1].count++;
+      } else {
+        map[2].pnl += t.pnl;
+        map[2].count++;
+      }
+    });
+    return map;
+  }, [trades]);
+
+  const mistakeData = useMemo(() => {
+    const map: Record<string, { name: string, value: number }> = {};
+    trades.forEach(t => {
+      t.mistakeTags?.forEach(tag => {
+        if (!map[tag]) map[tag] = { name: tag, value: 0 };
+        map[tag].value += 1;
+      });
+    });
+    return Object.values(map).sort((a, b) => b.value - a.value);
+  }, [trades]);
+
+  const strategyInsights = useMemo(() => {
+    if (trades.length === 0) return null;
+    
+    const bestDay = dailyData.reduce((prev, current) => (prev.pnl > current.pnl) ? prev : current);
+    const bestStrategy = strategyData[0] || { name: 'N/A', pnl: 0 };
+    const bestSession = sessionData.reduce((prev, current) => (prev.pnl > current.pnl) ? prev : current || { name: 'N/A', pnl: 0 });
+    
+    const wins = trades.filter(t => t.pnl > 0);
+    const avgWinRR = wins.length > 0 ? wins.reduce((acc, t) => acc + (t.riskReward || 0), 0) / wins.length : 0;
+    
+    const highRRTrades = trades.filter(t => (t.riskReward || 0) >= 3).length;
+
+    // Rule Consistency Analysis
+    const ruleWinMap: Record<string, { wins: number, total: number }> = {};
+    trades.forEach(t => {
+      t.followedRules?.forEach(rule => {
+        if (!ruleWinMap[rule]) ruleWinMap[rule] = { wins: 0, total: 0 };
+        ruleWinMap[rule].total++;
+        if (t.pnl > 0) ruleWinMap[rule].wins++;
+      });
+    });
+
+    const rulePerformance = Object.entries(ruleWinMap)
+      .map(([name, stats]) => ({
+        name,
+        winRate: (stats.wins / stats.total) * 100,
+        total: stats.total
+      }))
+      .sort((a, b) => b.winRate - a.winRate);
+    
+    return {
+      bestDay: bestDay.name,
+      bestStrategy: bestStrategy.name,
+      bestSession: bestSession.name,
+      avgWinRR: avgWinRR.toFixed(2),
+      highRRCount: highRRTrades,
+      rulePerformance: rulePerformance.slice(0, 3)
+    };
+  }, [trades, dailyData, strategyData, sessionData]);
+
+  const expectancyData = useMemo(() => {
+    if (trades.length < 5) return [];
+    
+    const stats = {
+      winRate: trades.filter(t => t.pnl > 0).length / trades.length,
+      avgWin: trades.filter(t => t.pnl > 0).reduce((acc, t) => acc + t.pnl, 0) / (trades.filter(t => t.pnl > 0).length || 1),
+      avgLoss: Math.abs(trades.filter(t => t.pnl < 0).reduce((acc, t) => acc + t.pnl, 0) / (trades.filter(t => t.pnl < 0).length || 1))
+    };
+
+    const data = [];
+    let balance = 0;
+    for (let i = 0; i <= 20; i++) {
+        // Simple projection: (WR * AvgW) - (LR * AvgL)
+        const expectedReturn = (stats.winRate * stats.avgWin) - ((1 - stats.winRate) * stats.avgLoss);
+        data.push({
+            trade: `T+${i}`,
+            equity: balance
+        });
+        balance += expectedReturn;
+    }
+    return data;
+  }, [trades]);
+
   const analyticsStats = useMemo(() => {
     const total = trades.length;
     const wins = trades.filter(t => t.pnl > 0).length;
@@ -2476,9 +2595,10 @@ const Analytics = ({ trades, currency, hidePnL, user, profileName, onUpdateTrade
   }, [trades]);
 
   return (
-    <div className="space-y-8 pb-20">
-      {/* Top Level Analytics Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <div className="space-y-12 pb-20">
+      <ScrollAnimatedSection>
+        {/* Top Level Analytics Summary */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-3xl relative overflow-hidden group">
           <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
             <Trophy className="w-12 h-12 text-emerald-400" />
@@ -2530,8 +2650,43 @@ const Analytics = ({ trades, currency, hidePnL, user, profileName, onUpdateTrade
           </div>
         </div>
       </div>
+      </ScrollAnimatedSection>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <ScrollAnimatedSection delay={0.15}>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl relative overflow-hidden group">
+            <div className="absolute -right-4 -bottom-4 opacity-5 group-hover:opacity-10 transition-opacity">
+              <History className="w-20 h-20" />
+            </div>
+            <p className="text-[10px] text-zinc-500 uppercase font-black mb-2 tracking-widest">Alpha Session</p>
+            <p className="text-xl font-black text-white">{strategyInsights?.bestSession}</p>
+          </div>
+          <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl relative overflow-hidden group">
+            <div className="absolute -right-4 -bottom-4 opacity-5 group-hover:opacity-10 transition-opacity">
+              <Calendar className="w-20 h-20" />
+            </div>
+            <p className="text-[10px] text-zinc-500 uppercase font-black mb-2 tracking-widest">Golden Day</p>
+            <p className="text-xl font-black text-white">{strategyInsights?.bestDay}</p>
+          </div>
+          <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl relative overflow-hidden group">
+            <div className="absolute -right-4 -bottom-4 opacity-5 group-hover:opacity-10 transition-opacity">
+              <TrendingUp className="w-20 h-20" />
+            </div>
+            <p className="text-[10px] text-zinc-500 uppercase font-black mb-2 tracking-widest">Avg Win RR</p>
+            <p className="text-xl font-black text-emerald-400">{strategyInsights?.avgWinRR}R</p>
+          </div>
+          <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl relative overflow-hidden group">
+            <div className="absolute -right-4 -bottom-4 opacity-5 group-hover:opacity-10 transition-opacity">
+              <Target className="w-20 h-20" />
+            </div>
+            <p className="text-[10px] text-zinc-500 uppercase font-black mb-2 tracking-widest">High RR ({">"}3R)</p>
+            <p className="text-xl font-black text-indigo-400">{strategyInsights?.highRRCount}</p>
+          </div>
+        </div>
+      </ScrollAnimatedSection>
+
+      <ScrollAnimatedSection delay={0.1}>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-xl">
           <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-6">Performance by Strategy</h4>
           <div className="h-[300px]">
@@ -2644,12 +2799,195 @@ const Analytics = ({ trades, currency, hidePnL, user, profileName, onUpdateTrade
             </div>
           </div>
         </div>
+
+        <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-xl">
+          <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-6">Performance by Session</h4>
+          <div className="h-[300px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={sessionData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
+                <XAxis dataKey="name" stroke="#52525b" fontSize={10} axisLine={false} tickLine={false} />
+                <YAxis stroke="#52525b" fontSize={10} axisLine={false} tickLine={false} />
+                <Tooltip 
+                  cursor={{ fill: 'rgba(255,255,255,0.05)' }}
+                  contentStyle={{ backgroundColor: '#09090b', border: '1px solid #27272a', borderRadius: '8px' }}
+                />
+                <Bar dataKey="pnl" radius={[4, 4, 0, 0]}>
+                  {sessionData.map((entry, index) => (
+                    <Cell key={index} fill={entry.pnl >= 0 ? '#10b981' : '#f43f5e'} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-xl">
+          <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-6">Execution Flaws Distribution</h4>
+          <div className="h-[300px]">
+             {mistakeData.length > 0 ? (
+               <ResponsiveContainer width="100%" height="100%">
+                 <PieChart>
+                   <Pie
+                     data={mistakeData}
+                     cx="50%"
+                     cy="50%"
+                     innerRadius={60}
+                     outerRadius={80}
+                     fill="#8884d8"
+                     paddingAngle={5}
+                     dataKey="value"
+                   >
+                     {mistakeData.map((entry, index) => (
+                       <Cell key={`cell-${index}`} fill={COLORS[(index + 2) % COLORS.length]} />
+                     ))}
+                   </Pie>
+                   <Tooltip 
+                     contentStyle={{ backgroundColor: '#09090b', border: '1px solid #27272a', borderRadius: '12px' }}
+                   />
+                 </PieChart>
+               </ResponsiveContainer>
+             ) : (
+               <div className="h-full flex items-center justify-center text-zinc-600 text-xs italic">
+                 No execution flaws recorded yet. Keep it clean!
+               </div>
+             )}
+          </div>
+        </div>
       </div>
+      </ScrollAnimatedSection>
+
+      {/* Dive into Strategy Section */}
+      {trades.length > 10 ? (
+        <ScrollAnimatedSection delay={0.2}>
+          <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-10 relative overflow-hidden">
+            <div className="absolute top-0 right-0 -mr-20 -mt-20 w-80 h-80 bg-indigo-500/10 blur-[120px] rounded-full" />
+            
+            <div className="relative z-10">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
+                <div>
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="w-10 h-10 rounded-2xl bg-indigo-500 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                      <Cpu className="w-5 h-5 text-white" />
+                    </div>
+                    <h3 className="text-3xl font-black text-white tracking-tighter uppercase">Deep Strategy <span className="text-indigo-400">Analysis</span></h3>
+                  </div>
+                  <p className="text-zinc-500 max-w-xl text-sm italic">
+                    "The edge is in the data. We've synthesized your last {trades.length} executions into a predictive blueprint."
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-4 p-4 bg-zinc-950 border border-zinc-800 rounded-2xl">
+                  <div>
+                    <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-1">Expectancy</p>
+                    <p className={cn(
+                      "text-xl font-black",
+                      analyticsStats.profitFactor > 1 ? "text-emerald-400" : "text-rose-400"
+                    )}>
+                      {displayValue((analyticsStats.winRate/100 * analyticsStats.avgWin) - ((1 - analyticsStats.winRate/100) * analyticsStats.avgLoss), true)} / Trade
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
+                <div className="space-y-6">
+                  <h4 className="text-xs font-black text-white uppercase tracking-widest flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                    Winning Confluences
+                  </h4>
+                  <div className="space-y-3">
+                    {strategyInsights?.rulePerformance.map((rule, idx) => (
+                      <div key={idx} className="p-4 bg-zinc-950 border border-zinc-800 rounded-2xl group hover:border-emerald-500/30 transition-all">
+                        <div className="flex justify-between items-center mb-2">
+                          <span className="text-sm font-bold text-zinc-300">{rule.name}</span>
+                          <span className="text-xs font-black text-emerald-400">{rule.winRate.toFixed(0)}% WR</span>
+                        </div>
+                        <div className="w-full h-1 bg-zinc-900 rounded-full overflow-hidden">
+                          <motion.div 
+                            initial={{ width: 0 }}
+                            animate={{ width: `${rule.winRate}%` }}
+                            className="h-full bg-emerald-500"
+                          />
+                        </div>
+                        <p className="text-[10px] text-zinc-600 mt-2">Appeared in {rule.total} trades</p>
+                      </div>
+                    ))}
+                    {strategyInsights?.rulePerformance.length === 0 && (
+                      <p className="text-xs text-zinc-600 italic p-4">Add "Followed Rules" in your entry form to see this analysis.</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="lg:col-span-2 space-y-6">
+                   <h4 className="text-xs font-black text-white uppercase tracking-widest flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
+                    Growth Expectancy (Next 20 Trades)
+                  </h4>
+                  <div className="bg-zinc-950 border border-zinc-800 rounded-2xl p-6 h-[250px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={expectancyData}>
+                        <defs>
+                          <linearGradient id="colorEquity" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3}/>
+                            <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
+                        <XAxis dataKey="trade" stroke="#52525b" fontSize={10} axisLine={false} tickLine={false} />
+                        <YAxis stroke="#52525b" fontSize={10} axisLine={false} tickLine={false} hide />
+                        <Tooltip 
+                          contentStyle={{ backgroundColor: '#09090b', border: '1px solid #27272a', borderRadius: '8px' }}
+                        />
+                        <Area type="monotone" dataKey="equity" stroke="#6366f1" strokeWidth={3} fillOpacity={1} fill="url(#colorEquity)" />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <p className="text-[10px] text-zinc-600 text-center uppercase tracking-widest">Projection based on current win rate and R:R efficiency</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="bg-zinc-950/50 p-6 rounded-2xl border border-white/5">
+                  <h5 className="text-[10px] font-black uppercase text-indigo-400 mb-3 tracking-widest">Strength Profile</h5>
+                  <p className="text-sm text-zinc-400"><span className="text-white font-bold">{strategyInsights?.bestDay}s</span> are your high-conviction windows. Your risk discipline is 40% higher on these days.</p>
+                </div>
+                <div className="bg-zinc-950/50 p-6 rounded-2xl border border-white/5">
+                  <h5 className="text-[10px] font-black uppercase text-emerald-400 mb-3 tracking-widest">Alpha Setup</h5>
+                  <p className="text-sm text-zinc-400">The <span className="text-white font-bold">{strategyInsights?.bestStrategy}</span> has reached statistical significance. Scale position sizing by 0.5% here.</p>
+                </div>
+                <div className="bg-zinc-950/50 p-6 rounded-2xl border border-white/5">
+                  <h5 className="text-[10px] font-black uppercase text-rose-400 mb-3 tracking-widest">Efficiency Gap</h5>
+                  <p className="text-sm text-zinc-400">Trading outside <span className="text-white font-bold">{strategyInsights?.bestSession}</span> cost you {displayValue(trades.filter(t => t.pnl < 0).length * analyticsStats.avgLoss * 0.2)} in potential equity overflow.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </ScrollAnimatedSection>
+      ) : (
+        <ScrollAnimatedSection delay={0.2}>
+          <div className="bg-zinc-900 border border-zinc-800 border-dashed rounded-3xl p-10 text-center relative overflow-hidden group">
+             <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-indigo-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+            <Lock className="w-8 h-8 text-zinc-800 mx-auto mb-4" />
+            <h3 className="text-xl font-black text-zinc-500 tracking-tighter mb-2 uppercase">Analysis Engine <span className="text-zinc-800">Calibrating</span></h3>
+            <p className="text-zinc-600 text-sm max-w-sm mx-auto italic">
+              "We need 10 sample points to build your behavioral mirror." - {10 - trades.length} trades remaining to unlock Intelligence.
+            </p>
+            <div className="mt-8 max-w-xs mx-auto w-full h-1 bg-zinc-950 rounded-full overflow-hidden">
+               <motion.div 
+                initial={{ width: 0 }}
+                animate={{ width: `${(trades.length / 10) * 100}%` }}
+                className="h-full bg-indigo-500/30"
+               />
+            </div>
+          </div>
+        </ScrollAnimatedSection>
+      )}
 
       {/* Analytics Footer with Quotes */}
-      <div className="bg-zinc-900 border border-zinc-800 rounded-3xl overflow-hidden mb-12">
+      <ScrollAnimatedSection delay={0.2} className="bg-zinc-900 border border-zinc-800 rounded-3xl overflow-hidden mb-12">
         <PnLCalendar trades={trades} setSelectedTrade={setSelectedTrade} currency={currency} hidePnL={hidePnL} />
-      </div>
+      </ScrollAnimatedSection>
 
       <AnimatePresence>
         {selectedTrade && (
@@ -2914,6 +3252,31 @@ const Settings = ({
   onLogout: () => void
 }) => {
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [tempProfileName, setTempProfileName] = useState(settings.profileName);
+  const [showNameConfirm, setShowNameConfirm] = useState(false);
+
+  const lockPeriodHours = 720; // 30 days
+  const lastChanged = settings.profileNameLastChanged ? new Date(settings.profileNameLastChanged) : null;
+  const now = new Date();
+  
+  const canChangeName = !lastChanged || (now.getTime() - lastChanged.getTime()) > lockPeriodHours * 60 * 60 * 1000;
+  
+  const hoursRemaining = lastChanged 
+    ? Math.max(0, Math.ceil((lockPeriodHours * 60 * 60 * 1000 - (now.getTime() - lastChanged.getTime())) / (1000 * 60 * 60)))
+    : 0;
+
+  const handleApplyName = () => {
+    onUpdateSettings({ 
+      ...settings, 
+      profileName: tempProfileName,
+      profileNameLastChanged: new Date().toISOString()
+    });
+    setShowNameConfirm(false);
+  };
+
+  useEffect(() => {
+    setTempProfileName(settings.profileName);
+  }, [settings.profileName]);
 
   return (
     <div className="max-w-2xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -3086,12 +3449,62 @@ const Settings = ({
         <h3 className="text-xl font-bold text-zinc-100 mb-6 font-serif tracking-tight">Profile Settings</h3>
         <div className="space-y-6">
           <div>
-            <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">Display Name</label>
-            <input 
-              value={settings.profileName}
-              onChange={(e) => onUpdateSettings({ ...settings, profileName: e.target.value })}
-              className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-2 text-zinc-100 focus:ring-1 focus:ring-emerald-500 outline-none transition-all" 
-            />
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Display Name</label>
+              {!canChangeName && (
+                <span className="text-[10px] font-black text-rose-400 uppercase tracking-widest flex items-center gap-1">
+                  <Lock className="w-3 h-3" />
+                  Locked for {hoursRemaining} hours
+                </span>
+              )}
+            </div>
+            <div className="relative group">
+              <input 
+                value={tempProfileName}
+                onChange={(e) => setTempProfileName(e.target.value)}
+                disabled={!canChangeName}
+                placeholder="Enter your trading alias..."
+                className={cn(
+                  "w-full bg-zinc-950 border rounded-lg px-4 py-2 text-zinc-100 outline-none transition-all pr-32",
+                  !canChangeName ? "border-zinc-800 opacity-50 cursor-not-allowed" : "border-zinc-800 focus:ring-1 focus:ring-emerald-500"
+                )}
+              />
+              <AnimatePresence>
+                {tempProfileName !== settings.profileName && canChangeName && (
+                  <motion.div 
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 20 }}
+                    className="absolute right-2 top-1.5"
+                  >
+                    {!showNameConfirm ? (
+                      <button 
+                        onClick={() => setShowNameConfirm(true)}
+                        className="bg-emerald-500 text-black px-3 py-1 rounded-md text-[10px] font-black uppercase tracking-widest hover:bg-emerald-400 transition-colors shadow-lg shadow-emerald-500/20"
+                      >
+                        Update
+                      </button>
+                    ) : (
+                      <div className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 p-1 rounded-lg shadow-2xl">
+                        <span className="text-[9px] font-bold text-zinc-400 px-2 whitespace-nowrap">Satisfied? (Last change for 30d)</span>
+                        <button 
+                          onClick={handleApplyName}
+                          className="bg-emerald-500 text-black px-2 py-0.5 rounded text-[9px] font-black uppercase"
+                        >
+                          Yes
+                        </button>
+                        <button 
+                          onClick={() => setShowNameConfirm(false)}
+                          className="bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded text-[9px] font-black uppercase"
+                        >
+                          No
+                        </button>
+                      </div>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -3196,13 +3609,31 @@ const Settings = ({
   );
 };
 
-const Plan = ({ name, rules }: { name: string, rules: string[] }) => {
+const Plan = ({ 
+  settings, 
+  onUpdateSettings 
+}: { 
+  settings: UserSettings, 
+  onUpdateSettings: (s: UserSettings) => void 
+}) => {
   const [quoteIdx, setQuoteIdx] = useState(0);
+  const [activeTab, setActiveTab] = useState<'blueprint' | 'playbook'>('blueprint');
+  const [newRule, setNewRule] = useState("");
+  const [isAddingPlaybookItem, setIsAddingPlaybookItem] = useState(false);
+  
+  // Playbook Item Form State
+  const [playbookForm, setPlaybookForm] = useState<Partial<PlaybookItem>>({
+    title: "",
+    content: "",
+    checkpoints: []
+  });
+  const [newCheckpoint, setNewCheckpoint] = useState("");
+  const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     const interval = setInterval(() => {
       setQuoteIdx(prev => (prev + 1) % QUOTES.length);
-    }, 5 * 60 * 1000); // 5 minutes
+    }, 5 * 60 * 1000);
     return () => clearInterval(interval);
   }, []);
 
@@ -3214,87 +3645,447 @@ const Plan = ({ name, rules }: { name: string, rules: string[] }) => {
     setQuoteIdx(nextIdx);
   };
 
+  const handleAddRule = () => {
+    if (!newRule.trim()) return;
+    onUpdateSettings({
+      ...settings,
+      strategyRules: [...settings.strategyRules, newRule.trim()]
+    });
+    setNewRule("");
+  };
+
+  const handleDeleteRule = (rule: string) => {
+    onUpdateSettings({
+      ...settings,
+      strategyRules: settings.strategyRules.filter(r => r !== rule)
+    });
+  };
+
+  const handleToggleExpand = (id: string) => {
+    setExpandedItems(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const handleCreatePlaybookItem = () => {
+    if (!playbookForm.title || !playbookForm.content) return;
+    
+    const newItem: PlaybookItem = {
+      id: Math.random().toString(36).substring(7),
+      title: playbookForm.title,
+      content: playbookForm.content,
+      checkpoints: playbookForm.checkpoints || []
+    };
+
+    onUpdateSettings({
+      ...settings,
+      playbook: [...(settings.playbook || []), newItem]
+    });
+
+    setIsAddingPlaybookItem(false);
+    setPlaybookForm({ title: "", content: "", checkpoints: [] });
+  };
+
+  const handleDeletePlaybookItem = (id: string) => {
+    onUpdateSettings({
+      ...settings,
+      playbook: (settings.playbook || []).filter(item => item.id !== id),
+      activePlaybookId: settings.activePlaybookId === id ? null : settings.activePlaybookId
+    });
+  };
+
+  const handleActivatePlaybook = (id: string) => {
+    onUpdateSettings({
+      ...settings,
+      activePlaybookId: settings.activePlaybookId === id ? null : id
+    });
+  };
+
+  const addCheckpoint = () => {
+    if (!newCheckpoint.trim()) return;
+    setPlaybookForm(prev => ({
+      ...prev,
+      checkpoints: [...(prev.checkpoints || []), newCheckpoint.trim()]
+    }));
+    setNewCheckpoint("");
+  };
+
+  const removeCheckpoint = (idx: number) => {
+    setPlaybookForm(prev => ({
+      ...prev,
+      checkpoints: (prev.checkpoints || []).filter((_, i) => i !== idx)
+    }));
+  };
+
   return (
-    <div 
-      className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500"
-      onClick={shuffleQuote}
-    >
-      <div className="relative overflow-hidden bg-zinc-900 border border-zinc-800 rounded-3xl p-10 cursor-pointer group/plan">
-        <div className="absolute top-0 right-0 -mr-20 -mt-20 w-80 h-80 bg-emerald-500/10 blur-[120px] rounded-full" />
-        
-        <div className="relative z-10">
-          <h2 className="text-4xl font-black text-white tracking-tighter mb-2">My Strategic <span className="text-emerald-400">Blueprint</span></h2>
-          <p className="text-zinc-500 mb-10 max-w-xl">
-            A personalized trading framework designed for <span className="text-zinc-300 font-bold">{name}</span>. Consistency is the only bridge between goals and accomplishment.
-          </p>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-            <div className="space-y-6">
-              <h3 className="text-xs font-black uppercase tracking-[0.2em] text-zinc-400 flex items-center gap-3">
-                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                Core Trading Rules
-              </h3>
-              <div className="space-y-3">
-                {rules.map((rule, i) => (
-                  <div key={i} className="flex items-center gap-4 p-4 bg-zinc-950 border border-zinc-800 rounded-2xl group hover:border-emerald-500/30 transition-all">
-                    <div className="w-6 h-6 rounded-lg bg-zinc-900 flex items-center justify-center text-[10px] font-black text-zinc-500 group-hover:text-emerald-400 transition-colors">
-                      {i + 1}
-                    </div>
-                    <span className="text-sm text-zinc-300">{rule}</span>
-                  </div>
-                ))}
-                {rules.length === 0 && (
-                  <p className="text-xs text-zinc-600 italic">No rules defined. Head to settings to build your blueprint.</p>
-                )}
+    <ScrollAnimatedSection className="max-w-5xl mx-auto py-4">
+      {/* Header Section */}
+      <div className="relative overflow-hidden bg-zinc-900 border border-zinc-800 rounded-3xl p-8 mb-8">
+        <div className="absolute top-0 right-0 -mr-20 -mt-20 w-80 h-80 bg-emerald-500/5 blur-[120px] rounded-full" />
+        <div className="relative z-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
+          <div>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-8 h-8 rounded-xl bg-emerald-500 flex items-center justify-center">
+                <Target className="w-4 h-4 text-black" />
               </div>
+              <h2 className="text-3xl font-black text-white tracking-tighter">Strategic <span className="text-emerald-400">Hub</span></h2>
             </div>
-
-            <div className="space-y-6">
-              <h3 className="text-xs font-black uppercase tracking-[0.2em] text-zinc-400 flex items-center gap-3">
-                <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
-                Psychological Framework
-              </h3>
-              <motion.div 
-                key={quoteIdx}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="p-6 bg-indigo-500/5 border border-indigo-500/10 rounded-2xl space-y-4"
-              >
-                <div className="space-y-1">
-                  <p className="text-xs font-bold text-white uppercase tracking-tighter">Daily Mindset</p>
-                  <p className="text-lg font-serif italic text-indigo-200 leading-tight">
-                    "{QUOTES[quoteIdx]}"
-                  </p>
-                </div>
-                <div className="space-y-1 pt-2">
-                  <p className="text-xs font-bold text-white">Execution Over Outcome</p>
-                  <p className="text-[10px] text-zinc-500 leading-relaxed">Focus on following the plan perfectly. A losing trade that followed the rules is a success. A winning trade that broke rules is a failure.</p>
-                </div>
-                <div className="space-y-1 pt-2">
-                  <p className="text-xs font-bold text-white">The 1% Rule</p>
-                  <p className="text-[10px] text-zinc-500 leading-relaxed">Never risk more than 1% of equity on a single idea. Preservation of capital is priority number one.</p>
-                </div>
-              </motion.div>
-              
-              <div className="p-6 bg-zinc-950 border border-zinc-800 rounded-2xl">
-                <h4 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-4">Daily Routine</h4>
-                <ul className="space-y-3">
-                  {['Check economic calendar (News Folders)', 'Identify HTF structure', 'Mark liquidity pools', 'Wait for LTF displacement'].map((step, idx) => (
-                    <li key={idx} className="flex items-center gap-3 text-xs text-zinc-400">
-                      <div className="w-1 h-1 rounded-full bg-zinc-700" />
-                      {step}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
+            <p className="text-zinc-500 max-w-lg text-sm">
+              Your professional trading framework. Forge rules in the calm to execute with precision in the storm.
+            </p>
           </div>
-          <div className="mt-8 pt-8 border-t border-zinc-800 flex justify-center">
-            <p className="text-[8px] text-zinc-600 uppercase tracking-[0.3em]">Tap anywhere to shuffle motivation</p>
+          
+          <div className="flex bg-zinc-950 p-1 rounded-2xl border border-zinc-800">
+            <button 
+              onClick={() => setActiveTab('blueprint')}
+              className={cn(
+                "px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all",
+                activeTab === 'blueprint' ? "bg-emerald-500 text-black shadow-lg shadow-emerald-500/10" : "text-zinc-500 hover:text-zinc-300"
+              )}
+            >
+              Rules
+            </button>
+            <button 
+              onClick={() => setActiveTab('playbook')}
+              className={cn(
+                "px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all",
+                activeTab === 'playbook' ? "bg-indigo-500 text-white shadow-lg shadow-indigo-500/10" : "text-zinc-500 hover:text-zinc-300"
+              )}
+            >
+              Playbook
+            </button>
           </div>
         </div>
       </div>
-    </div>
+
+      <AnimatePresence mode="wait">
+        {activeTab === 'blueprint' ? (
+          <motion.div
+            key="blueprint"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="grid grid-cols-1 lg:grid-cols-3 gap-8"
+          >
+            {/* Rules Management */}
+            <div className="lg:col-span-2 space-y-6">
+              <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-8">
+                <div className="flex items-center justify-between mb-8">
+                  <div>
+                    <h3 className="text-xl font-black text-white tracking-tight">Core Execution Rules</h3>
+                    <p className="text-xs text-zinc-500">Non-negotiable mandates for every trade.</p>
+                  </div>
+                  <Target className="w-5 h-5 text-emerald-400 opacity-30" />
+                </div>
+
+                <div className="space-y-3 mb-8">
+                  {settings.strategyRules.map((rule, i) => (
+                    <motion.div 
+                      layout
+                      key={rule} 
+                      className="flex items-center justify-between gap-4 p-4 bg-zinc-950 border border-zinc-800 rounded-2xl group hover:border-emerald-500/30 transition-all"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="w-8 h-8 rounded-lg bg-zinc-900 flex items-center justify-center text-[10px] font-black text-zinc-500 group-hover:text-emerald-400 transition-colors border border-zinc-800">
+                          {i + 1}
+                        </div>
+                        <span className="text-sm text-zinc-300 font-medium">@{rule}</span>
+                      </div>
+                      <button 
+                        onClick={() => handleDeleteRule(rule)}
+                        className="p-2 text-zinc-600 hover:text-rose-400 hover:bg-rose-400/5 rounded-xl transition-all opacity-0 group-hover:opacity-100"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </motion.div>
+                  ))}
+                  
+                  <div className="flex gap-2 p-2 bg-zinc-950 border border-zinc-800 border-dashed rounded-2xl">
+                    <input 
+                      type="text"
+                      value={newRule}
+                      onChange={(e) => setNewRule(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleAddRule()}
+                      placeholder="Add a new non-negotiable rule..."
+                      className="flex-1 bg-transparent px-4 py-2 text-sm text-white placeholder:text-zinc-600 focus:outline-none"
+                    />
+                    <button 
+                      onClick={handleAddRule}
+                      className="p-2 bg-emerald-500 text-black rounded-xl hover:scale-105 active:scale-95 transition-all"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="p-6 bg-zinc-950 border border-zinc-800 rounded-2xl">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-1.5 h-10 rounded-full bg-indigo-500" />
+                    <div>
+                      <h4 className="text-xs font-black text-white uppercase tracking-widest">Rule Analysis</h4>
+                      <p className="text-[10px] text-zinc-500 italic">"Discipline is carrying out what you said you would do."</p>
+                    </div>
+                  </div>
+                  <p className="text-xs text-zinc-400 leading-relaxed">
+                    Your current ruleset focuses heavily on technical entry criteria. Consider adding a rule about <span className="text-indigo-400">risk management</span> or <span className="text-indigo-400">emotional preservation</span> after a loss.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Mindset Sidebar */}
+            <div className="space-y-6">
+              <motion.div 
+                key={quoteIdx}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                className="p-8 bg-zinc-900 border border-zinc-800 rounded-3xl relative overflow-hidden group cursor-pointer"
+                onClick={shuffleQuote}
+              >
+                <div className="absolute top-0 left-0 w-2 h-full bg-indigo-500 opacity-20 group-hover:opacity-100 transition-opacity" />
+                <BookOpen className="w-8 h-8 text-indigo-400 mb-6 opacity-20" />
+                <p className="text-xl font-serif italic text-white leading-tight mb-4">
+                  "{QUOTES[quoteIdx]}"
+                </p>
+                <p className="text-[10px] text-zinc-500 uppercase font-black tracking-widest">Tap to Refocus</p>
+              </motion.div>
+
+              <div className="p-8 bg-zinc-900 border border-zinc-800 rounded-3xl">
+                <h4 className="text-xs font-black text-white uppercase tracking-widest mb-6 flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  Live Framework
+                </h4>
+                <div className="space-y-4">
+                  <div className="p-4 bg-zinc-950 rounded-2xl border border-zinc-800">
+                    <p className="text-[10px] font-black text-zinc-500 uppercase mb-1">Current Focus</p>
+                    <p className="text-xs text-zinc-300 font-bold">HTF Bias Alignment</p>
+                  </div>
+                  <div className="p-4 bg-zinc-950 rounded-2xl border border-zinc-800">
+                    <p className="text-[10px] font-black text-zinc-500 uppercase mb-1">Execution Quality</p>
+                    <p className="text-xs text-zinc-300 font-bold">Wait for LTF Displacement</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        ) : (
+          <motion.div
+            key="playbook"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="space-y-8"
+          >
+            {/* Playbook List */}
+            <div className="grid grid-cols-1 gap-6">
+              {(settings.playbook || []).map((item) => (
+                <div 
+                  key={item.id}
+                  className={cn(
+                    "bg-zinc-900 border overflow-hidden rounded-3xl transition-all duration-300",
+                    settings.activePlaybookId === item.id 
+                      ? "border-emerald-500/50 shadow-2xl shadow-emerald-500/5" 
+                      : "border-zinc-800"
+                  )}
+                >
+                  <div className="p-6 flex items-center justify-between cursor-pointer hover:bg-zinc-800/30 transition-colors" onClick={() => handleToggleExpand(item.id)}>
+                    <div className="flex items-center gap-6">
+                      <div className={cn(
+                        "w-12 h-12 rounded-2xl flex items-center justify-center transition-all",
+                        settings.activePlaybookId === item.id ? "bg-emerald-500 text-black shadow-lg" : "bg-zinc-950 text-zinc-500 border border-zinc-800"
+                      )}>
+                        <BookOpen className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-3">
+                          <h4 className="text-lg font-black text-white tracking-tight">{item.title}</h4>
+                          {settings.activePlaybookId === item.id && (
+                            <span className="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 text-[10px] font-black uppercase tracking-widest border border-emerald-500/20">
+                              Active
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-zinc-500 truncate max-w-md">{item.content.substring(0, 100)}...</p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-4">
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); handleActivatePlaybook(item.id); }}
+                        className={cn(
+                          "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
+                          settings.activePlaybookId === item.id 
+                            ? "bg-zinc-800 text-zinc-400" 
+                            : "bg-emerald-500 text-black hover:scale-105"
+                        )}
+                      >
+                        {settings.activePlaybookId === item.id ? "Activated" : "Activate"}
+                      </button>
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); handleDeletePlaybookItem(item.id); }}
+                        className="p-2 text-zinc-600 hover:text-rose-400 transition-colors"
+                      >
+                        <Trash2 className="w-5 h-5" />
+                      </button>
+                      {expandedItems[item.id] ? <ChevronUp className="w-5 h-5 text-zinc-500" /> : <ChevronDown className="w-5 h-5 text-zinc-500" />}
+                    </div>
+                  </div>
+
+                  <AnimatePresence>
+                    {expandedItems[item.id] && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        className="border-t border-zinc-800 bg-zinc-950/30"
+                      >
+                        <div className="p-8 grid grid-cols-1 lg:grid-cols-2 gap-10">
+                          <div className="space-y-6">
+                            <div>
+                              <h5 className="text-[10px] font-black uppercase text-zinc-500 mb-3 tracking-widest">Strategy Logic</h5>
+                              <p className="text-sm text-zinc-300 leading-relaxed whitespace-pre-wrap">{item.content}</p>
+                            </div>
+                          </div>
+                          
+                          <div className="space-y-6">
+                            <div>
+                              <h5 className="text-[10px] font-black uppercase text-zinc-500 mb-3 tracking-widest">Execution Checkpoints</h5>
+                              <div className="space-y-2">
+                                {item.checkpoints.map((cp, idx) => (
+                                  <div key={idx} className="flex items-center gap-3 p-3 bg-zinc-900 border border-zinc-800 rounded-xl group/cp">
+                                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                                    <span className="text-xs text-zinc-400 group-hover:text-zinc-200 transition-colors">{cp}</span>
+                                  </div>
+                                ))}
+                                {item.checkpoints.length === 0 && (
+                                  <p className="text-xs text-zinc-600 italic">No checkpoints defined for this playbook item.</p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              ))}
+
+              {/* Add New Playbook Item Button */}
+              {!isAddingPlaybookItem ? (
+                <button 
+                  onClick={() => setIsAddingPlaybookItem(true)}
+                  className="w-full p-8 rounded-3xl border-2 border-dashed border-zinc-800 hover:border-indigo-500/50 hover:bg-indigo-500/5 text-zinc-600 hover:text-indigo-400 transition-all flex flex-col items-center justify-center gap-4 group"
+                >
+                  <div className="w-12 h-12 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center group-hover:scale-110 group-hover:bg-indigo-500 group-hover:text-white transition-all">
+                    <Plus className="w-6 h-6" />
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm font-black uppercase tracking-widest">Add New Playbook Chapter</p>
+                    <p className="text-[10px] mt-1 opacity-60">Define a new entry logic or risk management model</p>
+                  </div>
+                </button>
+              ) : (
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="bg-zinc-900 border border-zinc-800 rounded-3xl overflow-hidden"
+                >
+                  <div className="p-8 space-y-6">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-xl font-black text-white tracking-tight">New Strategy Blueprint</h4>
+                      <button onClick={() => setIsAddingPlaybookItem(false)} className="p-2 text-zinc-600 hover:text-zinc-300 transition-colors">
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div>
+                        <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-2 block">Strategy Name</label>
+                        <input 
+                          type="text"
+                          value={playbookForm.title}
+                          onChange={(e) => setPlaybookForm(prev => ({ ...prev, title: e.target.value }))}
+                          placeholder="e.g. Silver Bullet Integration"
+                          className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-indigo-500 transition-colors"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-2 block">Analytical Rationale</label>
+                        <textarea 
+                          value={playbookForm.content}
+                          onChange={(e) => setPlaybookForm(prev => ({ ...prev, content: e.target.value }))}
+                          placeholder="Describe the logic, the narrative, and the HTF/LTF confluence required..."
+                          rows={4}
+                          className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-indigo-500 transition-colors resize-none"
+                        />
+                      </div>
+
+                      <div className="space-y-4">
+                        <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block">Execution Checkpoints</label>
+                        <div className="flex gap-2">
+                          <input 
+                            type="text"
+                            value={newCheckpoint}
+                            onChange={(e) => setNewCheckpoint(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && addCheckpoint()}
+                            placeholder="Add a specific execution step..."
+                            className="flex-1 bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-indigo-500"
+                          />
+                          <button 
+                            onClick={addCheckpoint}
+                            className="px-4 bg-indigo-500 text-white rounded-xl hover:bg-indigo-400 transition-colors shadow-lg shadow-indigo-500/10"
+                          >
+                            <Plus className="w-5 h-5" />
+                          </button>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {playbookForm.checkpoints?.map((cp, idx) => (
+                            <div key={idx} className="flex items-center gap-2 px-3 py-1.5 bg-zinc-950 border border-zinc-800 rounded-lg group">
+                              <span className="text-[10px] text-zinc-400">{cp}</span>
+                              <button 
+                                onClick={() => removeCheckpoint(idx)}
+                                className="text-zinc-600 hover:text-rose-400 transition-colors"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="pt-6 border-t border-zinc-800 flex justify-end gap-3">
+                      <button 
+                        onClick={() => setIsAddingPlaybookItem(false)}
+                        className="px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest text-zinc-500 hover:text-zinc-300 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button 
+                        onClick={handleCreatePlaybookItem}
+                        className="px-8 py-2.5 bg-indigo-500 text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-indigo-500/20 hover:scale-105 transition-all"
+                      >
+                        Create Chapter
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </div>
+
+            {/* Empty State */}
+            {(!settings.playbook || settings.playbook.length === 0) && !isAddingPlaybookItem && (
+              <div className="py-20 text-center">
+                <Zap className="w-12 h-12 text-zinc-800 mx-auto mb-4" />
+                <h3 className="text-xl font-bold text-zinc-600 tracking-tight">Your playbook is empty</h3>
+                <p className="text-sm text-zinc-700 max-w-sm mx-auto mt-2 italic">
+                  Turn your trading observations into a repeatable system. Add segments for different market conditions or specific setups.
+                </p>
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </ScrollAnimatedSection>
   );
 };
 
@@ -3369,15 +4160,18 @@ const Execution = ({ trades, onUpdateTrade, currency, hidePnL, user }: { trades:
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-4xl font-black text-white tracking-tighter">Market <span className="text-indigo-400">Execution</span></h2>
-          <p className="text-zinc-500 text-sm">Visual analysis and deep trade reflection.</p>
+    <div className="space-y-8">
+      <ScrollAnimatedSection>
+        <div className="flex justify-between items-center">
+          <div>
+            <h2 className="text-4xl font-black text-white tracking-tighter">Market <span className="text-indigo-400">Execution</span></h2>
+            <p className="text-zinc-500 text-sm">Visual analysis and deep trade reflection.</p>
+          </div>
         </div>
-      </div>
+      </ScrollAnimatedSection>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+      <ScrollAnimatedSection delay={0.1}>
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
         {/* Fullscreen Overlay */}
         <AnimatePresence>
           {isFullscreen && (selectedTrade.executionImage || selectedTrade.screenshot) && (
@@ -3598,6 +4392,7 @@ const Execution = ({ trades, onUpdateTrade, currency, hidePnL, user }: { trades:
           )}
         </div>
       </div>
+      </ScrollAnimatedSection>
     </div>
   );
 };
@@ -3627,8 +4422,11 @@ export default function App() {
     startingBalance: 10000,
     riskPerTrade: 1,
     strategyRules: ['Structure Break', 'Liquidity Sweep', 'Fib 0.618 level', 'High Volume Confirmation'],
+    playbook: [],
+    activePlaybookId: null,
     theme: 'night',
-    hidePnL: false
+    hidePnL: false,
+    profileNameLastChanged: null
   });
 
   const [accounts, setAccounts] = useState<Account[]>([{
@@ -3640,8 +4438,11 @@ export default function App() {
       startingBalance: 10000,
       riskPerTrade: 1,
       strategyRules: ['Structure Break', 'Liquidity Sweep', 'Fib 0.618 level', 'High Volume Confirmation'],
+      playbook: [],
+      activePlaybookId: null,
       theme: 'night',
-      hidePnL: false
+      hidePnL: false,
+      profileNameLastChanged: null
     },
     trades: []
   }]);
@@ -3678,8 +4479,11 @@ export default function App() {
             startingBalance: 10000,
             riskPerTrade: 1,
             strategyRules: ['Structure Break', 'Liquidity Sweep', 'Fib 0.618 level', 'High Volume Confirmation'],
+            playbook: [],
+            activePlaybookId: null,
             theme: 'night',
-            hidePnL: false
+            hidePnL: false,
+            profileNameLastChanged: null
           };
           const newAcc = await dataService.createAccount('Primary Account', initialSettings);
           setAccounts([newAcc]);
@@ -4139,14 +4943,14 @@ export default function App() {
           "flex-1 overflow-y-auto scroll-smooth transition-colors duration-500",
           settings.theme === 'light' ? "bg-zinc-50" : "bg-[#0A0A0B]"
         )}>
-          <div className="p-6 sm:p-12 max-w-7xl mx-auto">
+          <div className="p-6 sm:p-10 max-w-[1800px] mx-auto w-full">
             <AnimatePresence mode="wait">
               <motion.div
                 key={activeTab}
-                initial={{ opacity: 0, scale: 0.98, y: 10 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.98, y: -10 }}
-                transition={{ duration: 0.4, ease: "easeOut" }}
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -15 }}
+                transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
               >
                 {activeTab === 'dashboard' && (
                   <Dashboard 
@@ -4173,7 +4977,12 @@ export default function App() {
                   />
                 )}
                 {activeTab === 'execution' && <Execution trades={sortedTrades} onUpdateTrade={handleUpdateTrade} currency={settings.currency} hidePnL={settings.hidePnL} user={user} />}
-                {activeTab === 'plan' && <Plan name={settings.profileName} rules={settings.strategyRules} />}
+                {activeTab === 'plan' && (
+                  <Plan 
+                    settings={settings} 
+                    onUpdateSettings={handleUpdateSettings} 
+                  />
+                )}
                 {activeTab === 'analytics' && <Analytics trades={sortedTrades} currency={settings.currency} hidePnL={settings.hidePnL} user={user} profileName={settings.profileName} onUpdateTrade={handleUpdateTrade} />}
                 {activeTab === 'settings' && (
                   <Settings 

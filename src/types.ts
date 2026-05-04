@@ -32,14 +32,24 @@ export interface Trade {
   executionImage?: string;
 }
 
+export interface PlaybookItem {
+  id: string;
+  title: string;
+  content: string;
+  checkpoints: string[];
+}
+
 export interface UserSettings {
   profileName: string;
   currency: string;
   startingBalance: number;
   riskPerTrade: number;
   strategyRules: string[];
+  playbook: PlaybookItem[];
+  activePlaybookId: string | null;
   theme: 'night' | 'light';
   hidePnL: boolean;
+  profileNameLastChanged: string | null;
 }
 
 export interface Account {
