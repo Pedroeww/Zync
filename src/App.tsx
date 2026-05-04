@@ -3139,8 +3139,8 @@ const Execution = ({ trades, onUpdateTrade, currency, hidePnL, user }: { trades:
                     if (file) handleImageUpload(file);
                   }}
                 />
-                {selectedTrade.executionImage ? (
-                  <img src={selectedTrade.executionImage} alt="Chart Execution" className="w-full h-full object-cover" />
+                {selectedTrade.executionImage || selectedTrade.screenshot ? (
+                  <img src={selectedTrade.executionImage || selectedTrade.screenshot} alt="Chart Execution" className="w-full h-full object-cover" />
                 ) : (
                   <div className="flex flex-col items-center justify-center h-full gap-4 text-zinc-600">
                     <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center border border-white/5 mb-2">
@@ -3175,7 +3175,7 @@ const Execution = ({ trades, onUpdateTrade, currency, hidePnL, user }: { trades:
                     <input 
                       type="text" 
                       placeholder="Or enter Image URL..."
-                      defaultValue={selectedTrade.executionImage || ''}
+                      defaultValue={selectedTrade.executionImage || selectedTrade.screenshot || ''}
                       onClick={(e) => e.stopPropagation()}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') {
