@@ -681,9 +681,11 @@ const TermsContent = () => (
   </>
 );
 
-const ExportModal = ({ trades, profileName, onClose, currency, hidePnL }: { trades: Trade[], profileName: string, onClose: () => void, currency: string, hidePnL: boolean }) => {
-  const [rangeType, setRangeType] = useState<'day' | 'week' | 'month' | 'ytd' | 'custom'>('month');
-  const [customRange, setCustomRange] = useState<{ start: Date | null, end: Date | null }>({ start: null, end: null });
+const ExportModal = ({ trades, profileName, onClose, currency, hidePnL, initialTradeId }: { trades: Trade[], profileName: string, onClose: () => void, currency: string, hidePnL: boolean, initialTradeId?: string }) => {
+  const [rangeType, setRangeType] = useState<'day' | 'week' | 'month' | 'ytd' | 'custom' | 'trade'>(initialTradeId ? 'trade' : 'month');
+  const [selectedDates, setSelectedDates] = useState<Date[]>([]);
+  const [selectedTradeId, setSelectedTradeId] = useState<string | null>(initialTradeId || null);
+  const [currentMonth, setCurrentMonth] = useState(new Date());
   const [isCapturing, setIsCapturing] = useState(false);
   const posterRef = React.useRef<HTMLDivElement>(null);
 
@@ -698,17 +700,23 @@ const ExportModal = ({ trades, profileName, onClose, currency, hidePnL }: { trad
     const now = new Date();
 
     if (rangeType === 'day') {
-      selectedTrades = trades.filter(t => isSameDay(parseISO(t.entryDate), now));
+      selectedTrades = trades.filter(t => isSameDay(parseISO(t.exitDate || t.entryDate), now));
     } else if (rangeType === 'week') {
-      selectedTrades = trades.filter(t => isWithinInterval(parseISO(t.entryDate), { start: startOfWeek(now), end: endOfWeek(now) }));
+      selectedTrades = trades.filter(t => isWithinInterval(parseISO(t.exitDate || t.entryDate), { start: startOfWeek(now), end: endOfWeek(now) }));
     } else if (rangeType === 'month') {
-      selectedTrades = trades.filter(t => isWithinInterval(parseISO(t.entryDate), { start: startOfMonth(now), end: endOfMonth(now) }));
+      selectedTrades = trades.filter(t => isWithinInterval(parseISO(t.exitDate || t.entryDate), { start: startOfMonth(now), end: endOfMonth(now) }));
     } else if (rangeType === 'ytd') {
-      selectedTrades = trades.filter(t => isWithinInterval(parseISO(t.entryDate), { start: startOfYear(now), end: now }));
-    } else if (rangeType === 'custom' && customRange.start && customRange.end) {
-      const start = customRange.start < customRange.end ? customRange.start : customRange.end;
-      const end = customRange.start < customRange.end ? customRange.end : customRange.start;
-      selectedTrades = trades.filter(t => isWithinInterval(parseISO(t.entryDate), { start: startOfDay(start), end: endOfWeek(end) }));
+      selectedTrades = trades.filter(t => isWithinInterval(parseISO(t.exitDate || t.entryDate), { start: startOfYear(now), end: now }));
+    } else if (rangeType === 'custom') {
+      if (selectedDates.length === 0) return null;
+      selectedTrades = trades.filter(t => 
+        selectedDates.some(d => isSameDay(parseISO(t.exitDate || t.entryDate), d))
+      );
+    } else if (rangeType === 'trade') {
+      if (!selectedTradeId) return null;
+      const trade = trades.find(t => t.id === selectedTradeId);
+      if (!trade) return null;
+      selectedTrades = [trade];
     }
 
     if (selectedTrades.length === 0) return null;
@@ -726,7 +734,7 @@ const ExportModal = ({ trades, profileName, onClose, currency, hidePnL }: { trad
       mostUsedSide,
       count: selectedTrades.length
     };
-  }, [trades, rangeType, customRange]);
+  }, [trades, rangeType, selectedDates, selectedTradeId]);
 
   const handleExport = async () => {
     if (!posterRef.current || !stats) return;
@@ -746,6 +754,55 @@ const ExportModal = ({ trades, profileName, onClose, currency, hidePnL }: { trad
     }
   };
 
+  const handleDownloadCSV = () => {
+    if (!stats) return;
+    
+    let selectedTrades: Trade[] = [];
+    const now = new Date();
+
+    if (rangeType === 'day') {
+      selectedTrades = trades.filter(t => isSameDay(parseISO(t.entryDate), now));
+    } else if (rangeType === 'week') {
+      selectedTrades = trades.filter(t => isWithinInterval(parseISO(t.entryDate), { start: startOfWeek(now), end: endOfWeek(now) }));
+    } else if (rangeType === 'month') {
+      selectedTrades = trades.filter(t => isWithinInterval(parseISO(t.entryDate), { start: startOfMonth(now), end: endOfMonth(now) }));
+    } else if (rangeType === 'ytd') {
+      selectedTrades = trades.filter(t => isWithinInterval(parseISO(t.entryDate), { start: startOfYear(now), end: now }));
+    } else if (rangeType === 'trade') {
+      selectedTrades = trades.filter(t => t.id === selectedTradeId);
+    }
+
+    if (selectedTrades.length === 0) return;
+
+    const headers = ['Date', 'Asset', 'Side', 'Entry', 'Exit', 'P&L', 'P&L %', 'Strategy'];
+    const rows = selectedTrades.map(t => [
+      t.entryDate,
+      t.asset,
+      t.side,
+      t.entryPrice,
+      t.exitPrice,
+      t.pnl,
+      t.pnlPercentage,
+      t.strategy
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `zync_trades_${format(new Date(), 'yyyy-MM-dd')}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    onClose();
+  };
+
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
       <motion.div 
@@ -755,16 +812,16 @@ const ExportModal = ({ trades, profileName, onClose, currency, hidePnL }: { trad
       />
       <motion.div 
         initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
-        className="relative w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-3xl p-6 overflow-hidden"
+        className="relative w-full max-w-lg bg-zinc-900 border border-zinc-800 rounded-3xl p-6 overflow-hidden"
       >
         <div className="flex justify-between items-center mb-6">
-          <h3 className="text-xl font-black text-white uppercase tracking-tighter">Export Performance</h3>
+          <h3 className="text-xl font-black text-white uppercase tracking-tighter">Export Options</h3>
           <button onClick={onClose} className="p-2 bg-zinc-800 rounded-xl text-zinc-500 hover:text-zinc-100">
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="space-y-4 mb-8">
+        <div className="space-y-4 mb-4">
           <div className="grid grid-cols-2 gap-2">
             {(['day', 'week', 'month', 'ytd'] as const).map(type => (
               <button
@@ -780,39 +837,83 @@ const ExportModal = ({ trades, profileName, onClose, currency, hidePnL }: { trad
             ))}
           </div>
           
-          <div className="p-4 bg-zinc-950 border border-zinc-800 rounded-2xl">
-            <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-3">Custom Range Selection</p>
-            <div className="grid grid-cols-7 gap-1">
-              {/* Simplified mini calendar for range selection */}
-              {eachDayOfInterval({ start: subDays(new Date(), 13), end: new Date() }).map((day, i) => {
-                const isSelected = (customRange.start && isSameDay(day, customRange.start)) || (customRange.end && isSameDay(day, customRange.end));
-                const isInRange = customRange.start && customRange.end && isWithinInterval(day, { 
-                  start: customRange.start < customRange.end ? customRange.start : customRange.end, 
-                  end: customRange.start < customRange.end ? customRange.end : customRange.start 
-                });
-                return (
-                  <button
-                    key={i}
-                    onClick={() => {
-                      setRangeType('custom');
-                      if (!customRange.start || (customRange.start && customRange.end)) {
-                        setCustomRange({ start: day, end: null });
-                      } else {
-                        setCustomRange({ ...customRange, end: day });
-                      }
-                    }}
-                    className={cn(
-                      "aspect-square rounded flex items-center justify-center text-[10px] font-bold transition-all",
-                      isSelected ? "bg-indigo-500 text-white" : 
-                      isInRange ? "bg-indigo-500/20 text-indigo-300" :
-                      "hover:bg-zinc-800 text-zinc-600"
-                    )}
+          <div className="p-4 bg-zinc-950 border border-zinc-800 rounded-3xl">
+            <div className="flex items-center justify-between mb-4">
+              <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Select Individual Dates</p>
+              <div className="flex items-center gap-2">
+                <p className="text-[10px] font-bold text-zinc-400">{format(currentMonth, 'MMM yyyy')}</p>
+                <div className="flex gap-1">
+                  <button 
+                    onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
+                    className="p-1 hover:bg-zinc-800 rounded-lg text-zinc-500 transition-colors"
                   >
-                    {format(day, 'd')}
+                    <ChevronLeft className="w-3 h-3" />
                   </button>
-                );
-              })}
+                  <button 
+                    onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
+                    className="p-1 hover:bg-zinc-800 rounded-lg text-zinc-500 transition-colors"
+                  >
+                    <ChevronRight className="w-3 h-3" />
+                  </button>
+                </div>
+              </div>
             </div>
+
+            <div className="grid grid-cols-7 gap-1 mb-2">
+              {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
+                <div key={i} className="text-center text-[8px] font-black text-zinc-700">{d}</div>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-7 gap-1">
+              {(() => {
+                const start = startOfWeek(startOfMonth(currentMonth));
+                const end = endOfWeek(endOfMonth(currentMonth));
+                return eachDayOfInterval({ start, end }).map((day, i) => {
+                  const isCurMonth = isSameDay(startOfMonth(day), startOfMonth(currentMonth));
+                  const isSelected = selectedDates.some(d => isSameDay(d, day));
+                  const hasTrades = trades.some(t => isSameDay(parseISO(t.exitDate || t.entryDate), day));
+
+                  return (
+                    <button
+                      key={i}
+                      disabled={!isCurMonth}
+                      onClick={() => {
+                        setRangeType('custom');
+                        if (isSelected) {
+                          setSelectedDates(selectedDates.filter(d => !isSameDay(d, day)));
+                        } else {
+                          setSelectedDates([...selectedDates, day]);
+                        }
+                      }}
+                      className={cn(
+                        "aspect-square rounded-lg flex flex-col items-center justify-center text-[10px] font-bold transition-all relative",
+                        !isCurMonth ? "opacity-0 pointer-events-none" : 
+                        isSelected ? "bg-emerald-500 text-black" : 
+                        "hover:bg-zinc-800 text-zinc-400"
+                      )}
+                    >
+                      {format(day, 'd')}
+                      {hasTrades && !isSelected && (
+                        <div className="absolute bottom-1 w-1 h-1 rounded-full bg-emerald-500/50" />
+                      )}
+                    </button>
+                  );
+                });
+              })()}
+            </div>
+
+            {selectedDates.length > 0 && (
+              <div className="mt-4 pt-3 border-t border-zinc-800/50 flex justify-between items-center">
+                <p className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest">{selectedDates.length} selected</p>
+                <button 
+                  onClick={() => setSelectedDates([])}
+                  className="text-[9px] font-black text-rose-500 uppercase tracking-widest hover:text-rose-400"
+                >
+                  Clear All
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -827,20 +928,30 @@ const ExportModal = ({ trades, profileName, onClose, currency, hidePnL }: { trad
               <p className="text-xs text-emerald-400 font-bold">+{stats.totalPnLPercent.toFixed(2)}% Performance</p>
             </div>
             
-            <button
-              onClick={handleExport}
-              disabled={isCapturing}
-              className="w-full py-4 bg-white text-black text-xs font-black uppercase tracking-widest rounded-2xl hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3 shadow-xl shadow-white/5"
-            >
-              {isCapturing ? (
-                <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <>
-                  <CreditCard className="w-4 h-4" />
-                  Generate Poster
-                </>
-              )}
-            </button>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={handleExport}
+                disabled={isCapturing}
+                className="py-4 bg-white text-black text-[10px] font-black uppercase tracking-widest rounded-2xl hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-xl shadow-white/5"
+              >
+                {isCapturing ? (
+                  <div className="w-3 h-3 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <>
+                    <CreditCard className="w-3 h-3" />
+                    Poster
+                  </>
+                )}
+              </button>
+
+              <button
+                onClick={handleDownloadCSV}
+                className="py-4 bg-zinc-800 text-white text-[10px] font-black uppercase tracking-widest rounded-2xl hover:bg-zinc-700 transition-all flex items-center justify-center gap-2"
+              >
+                <FileText className="w-3 h-3" />
+                CSV Data
+              </button>
+            </div>
           </div>
         ) : (
           <div className="p-8 text-center bg-zinc-950 border border-zinc-800 border-dashed rounded-3xl">
@@ -1276,6 +1387,7 @@ const TradeJournal = ({ trades, onAddTrade, onUpdateTrade, onDeleteTrade, settin
   const [entryDate, setEntryDate] = useState<string>(new Date().toISOString());
   const [exitDate, setExitDate] = useState<string>(new Date().toISOString());
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
 
   useEffect(() => {
     const resolve = async () => {
