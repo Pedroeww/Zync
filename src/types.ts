@@ -47,7 +47,7 @@ export interface UserSettings {
   strategyRules: string[];
   playbook: PlaybookItem[];
   activePlaybookId: string | null;
-  theme: 'night' | 'light';
+  theme: 'night' | 'light' | 'midnight' | 'obsidian' | 'slate' | 'forest' | 'abyss' | 'carbon';
   hidePnL: boolean;
   profileNameLastChanged: string | null;
 }

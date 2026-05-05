@@ -38,8 +38,8 @@ import {
   Shield,
   FileText,
   Lock,
+  Edit,
   Chrome,
-  Apple,
   CheckCircle2,
   Zap
 } from 'lucide-react';
@@ -179,7 +179,7 @@ const QUOTES = [
 
 interface AuthPageProps {
   onAuthComplete: (user: User) => void;
-  theme: 'night' | 'light';
+  theme: 'night' | 'light' | 'midnight' | 'obsidian' | 'slate' | 'forest' | 'abyss' | 'carbon';
   embedded?: boolean;
 }
 
@@ -210,27 +210,8 @@ const AuthPage = ({ onAuthComplete, theme, embedded = false }: AuthPageProps) =>
     }
   };
 
-  const handleAppleLogin = async () => {
-    setLoading(true);
-    setError(null);
-    setSuccessMessage(null);
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'apple',
-        options: {
-          redirectTo: window.location.origin,
-        },
-      });
-      if (error) throw error;
-    } catch (err: any) {
-      setError(err.message || 'Failed to connect with Apple');
-      setLoading(false);
-    }
-  };
-
-  const handleSocialLogin = async (provider: 'google' | 'apple') => {
+  const handleSocialLogin = async (provider: 'google') => {
     if (provider === 'google') return handleGoogleLogin();
-    if (provider === 'apple') return handleAppleLogin();
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -292,7 +273,15 @@ const AuthPage = ({ onAuthComplete, theme, embedded = false }: AuthPageProps) =>
 
   const containerStyles = embedded 
     ? "w-full p-4 md:p-8 bg-zinc-950/40" 
-    : cn("min-h-screen flex items-center justify-center p-6 bg-[#0A0A0B]", theme === 'light' && "bg-zinc-50");
+    : cn("min-h-screen flex items-center justify-center p-6 transition-colors duration-500", 
+        theme === 'light' ? "bg-zinc-50" : 
+        theme === 'midnight' ? "bg-[#020617]" :
+        theme === 'obsidian' ? "bg-black" :
+        theme === 'slate' ? "bg-[#18181b]" :
+        theme === 'forest' ? "bg-[#022c22]" :
+        theme === 'abyss' ? "bg-[#0f172a]" :
+        theme === 'carbon' ? "bg-[#171717]" :
+        "bg-[#0A0A0B]");
 
   const toggleMode = () => {
     setIsSignUp(!isSignUp);
@@ -335,22 +324,14 @@ const AuthPage = ({ onAuthComplete, theme, embedded = false }: AuthPageProps) =>
           </p>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 mb-6">
+        <div className="mb-6">
           <button
             onClick={handleGoogleLogin}
             disabled={loading}
-            className="flex items-center justify-center gap-2 py-3 bg-white/5 hover:bg-white/10 border border-white/5 rounded-2xl text-[10px] font-black text-white uppercase tracking-widest transition-all hover:scale-[1.02] active:scale-[0.98]"
+            className="w-full flex items-center justify-center gap-2 py-3 bg-white/5 hover:bg-white/10 border border-white/5 rounded-2xl text-[10px] font-black text-white uppercase tracking-widest transition-all hover:scale-[1.02] active:scale-[0.98]"
           >
             <Chrome className="w-3.5 h-3.5 text-rose-400" />
             Continue with Google
-          </button>
-          <button
-            onClick={handleAppleLogin}
-            disabled={loading}
-            className="flex items-center justify-center gap-2 py-3 bg-white/5 hover:bg-white/10 border border-white/5 rounded-2xl text-[10px] font-black text-white uppercase tracking-widest transition-all hover:scale-[1.02] active:scale-[0.98]"
-          >
-            <Apple className="w-3.5 h-3.5" />
-            Continue with Apple
           </button>
         </div>
 
@@ -3254,6 +3235,7 @@ const Settings = ({
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [tempProfileName, setTempProfileName] = useState(settings.profileName);
   const [showNameConfirm, setShowNameConfirm] = useState(false);
+  const [showLogoutConfirmSettings, setShowLogoutConfirmSettings] = useState(false);
 
   const lockPeriodHours = 720; // 30 days
   const lastChanged = settings.profileNameLastChanged ? new Date(settings.profileNameLastChanged) : null;
@@ -3277,6 +3259,17 @@ const Settings = ({
   useEffect(() => {
     setTempProfileName(settings.profileName);
   }, [settings.profileName]);
+
+  const [tempStrategyRules, setTempStrategyRules] = useState(settings.strategyRules.join(', '));
+
+  useEffect(() => {
+    setTempStrategyRules(settings.strategyRules.join(', '));
+  }, [settings.strategyRules]);
+
+  const handleStrategyRulesBlur = () => {
+    const rules = tempStrategyRules.split(',').map(s => s.trim()).filter(Boolean);
+    onUpdateSettings({ ...settings, strategyRules: rules });
+  };
 
   return (
     <div className="max-w-2xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -3304,12 +3297,30 @@ const Settings = ({
                 <p className="text-[10px] text-zinc-500 uppercase tracking-widest">{user.email}</p>
               </div>
             </div>
-            <button 
-              onClick={onLogout}
-              className="px-6 py-2 bg-rose-500/10 text-rose-400 border border-rose-500/20 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-rose-500 hover:text-white transition-all"
-            >
-              Disconnect
-            </button>
+            {showLogoutConfirmSettings ? (
+              <div className="flex items-center gap-2 animate-in fade-in zoom-in duration-200">
+                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest px-2">Are you sure?</span>
+                <button 
+                  onClick={onLogout}
+                  className="px-4 py-2 bg-rose-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-rose-400 transition-all"
+                >
+                  Yes
+                </button>
+                <button 
+                  onClick={() => setShowLogoutConfirmSettings(false)}
+                  className="px-4 py-2 bg-zinc-800 text-zinc-400 rounded-xl text-[10px] font-black uppercase tracking-widest hover:text-white transition-all"
+                >
+                  No
+                </button>
+              </div>
+            ) : (
+              <button 
+                onClick={() => setShowLogoutConfirmSettings(true)}
+                className="px-6 py-2 bg-rose-500/10 text-rose-400 border border-rose-500/20 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-rose-500 hover:text-white transition-all"
+              >
+                Disconnect
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -3406,42 +3417,36 @@ const Settings = ({
       </div>
       <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-xl shadow-xl">
         <h3 className="text-xl font-bold text-zinc-100 mb-6 font-serif tracking-tight">Appearance</h3>
-        <div className="flex gap-4">
-          <button 
-            onClick={() => onUpdateSettings({ ...settings, theme: 'night' })}
-            className={cn(
-              "flex-1 p-4 rounded-xl border flex flex-col gap-3 transition-all",
-              settings.theme === 'night' 
-                ? "bg-emerald-500/10 border-emerald-500 shadow-lg shadow-emerald-500/5" 
-                : "bg-zinc-950 border-zinc-800 hover:border-zinc-700"
-            )}
-          >
-            <div className="w-full aspect-video bg-zinc-900 rounded-lg border border-zinc-800 flex items-center justify-center">
-              <div className="w-1/2 h-1 bg-emerald-500 rounded-full" />
-            </div>
-            <div className="flex items-center justify-between">
-              <span className={cn("text-[10px] font-black uppercase tracking-widest", settings.theme === 'night' ? "text-white" : "text-zinc-500")}>Night Mode</span>
-              {settings.theme === 'night' && <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />}
-            </div>
-          </button>
-
-          <button 
-            onClick={() => onUpdateSettings({ ...settings, theme: 'light' })}
-            className={cn(
-              "flex-1 p-4 rounded-xl border flex flex-col gap-3 transition-all",
-              settings.theme === 'light' 
-                ? "bg-indigo-500/10 border-indigo-500 shadow-lg shadow-indigo-500/5" 
-                : "bg-zinc-950 border-zinc-800 hover:border-zinc-700"
-            )}
-          >
-            <div className="w-full aspect-video bg-zinc-100 rounded-lg border border-zinc-300 flex items-center justify-center">
-              <div className="w-1/2 h-1 bg-indigo-500 rounded-full" />
-            </div>
-            <div className="flex items-center justify-between">
-              <span className={cn("text-[10px] font-black uppercase tracking-widest", settings.theme === 'light' ? "text-indigo-600" : "text-zinc-500")}>Lighter Mode</span>
-              {settings.theme === 'light' && <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />}
-            </div>
-          </button>
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-3">
+          {[
+            { id: 'night', name: 'Night', color: 'bg-zinc-950', border: 'border-zinc-800', active: 'bg-emerald-500/10 border-emerald-500', marker: 'bg-emerald-500' },
+            { id: 'midnight', name: 'Midnight', color: 'bg-[#020617]', border: 'border-blue-900/30', active: 'bg-blue-500/10 border-blue-500', marker: 'bg-blue-500' },
+            { id: 'obsidian', name: 'Obsidian', color: 'bg-black', border: 'border-zinc-800', active: 'bg-white/10 border-white', marker: 'bg-white' },
+            { id: 'slate', name: 'Slate', color: 'bg-[#18181b]', border: 'border-zinc-700', active: 'bg-zinc-500/10 border-zinc-400', marker: 'bg-zinc-400' },
+            { id: 'forest', name: 'Forest', color: 'bg-[#022c22]', border: 'border-emerald-900/30', active: 'bg-emerald-500/10 border-emerald-500', marker: 'bg-emerald-500' },
+            { id: 'abyss', name: 'Abyss', color: 'bg-[#0f172a]', border: 'border-slate-800', active: 'bg-indigo-500/10 border-indigo-500', marker: 'bg-indigo-500' },
+            { id: 'carbon', name: 'Carbon', color: 'bg-[#171717]', border: 'border-zinc-800', active: 'bg-zinc-100/10 border-zinc-400', marker: 'bg-zinc-400' },
+            { id: 'light', name: 'Lighter', color: 'bg-white border-zinc-200', border: 'border-zinc-200', active: 'bg-indigo-500/10 border-indigo-500', marker: 'bg-indigo-500' }
+          ].map((th) => (
+            <button 
+              key={th.id}
+              onClick={() => onUpdateSettings({ ...settings, theme: th.id as any })}
+              className={cn(
+                "p-3 rounded-xl border flex flex-col gap-2 transition-all",
+                settings.theme === th.id 
+                  ? th.active + " shadow-lg" 
+                  : "bg-zinc-950 border-zinc-800 hover:border-zinc-700"
+              )}
+            >
+              <div className={cn("w-full aspect-[2/1] rounded-lg border flex items-center justify-center", th.color, th.border)}>
+                <div className={cn("w-1/3 h-0.5 rounded-full", th.marker)} />
+              </div>
+              <div className="flex items-center justify-between">
+                <span className={cn("text-[9px] font-black uppercase tracking-widest", settings.theme === th.id ? "text-white" : "text-zinc-500")}>{th.name}</span>
+                {settings.theme === th.id && <div className={cn("w-1 h-1 rounded-full", th.marker)} />}
+              </div>
+            </button>
+          ))}
         </div>
       </div>
 
@@ -3450,7 +3455,10 @@ const Settings = ({
         <div className="space-y-6">
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Display Name</label>
+              <div className="flex flex-col">
+                <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Display Name</label>
+                <span className="text-[9px] text-zinc-600 font-medium italic">(This can be changed after every 30days)</span>
+              </div>
               {!canChangeName && (
                 <span className="text-[10px] font-black text-rose-400 uppercase tracking-widest flex items-center gap-1">
                   <Lock className="w-3 h-3" />
@@ -3486,7 +3494,7 @@ const Settings = ({
                       </button>
                     ) : (
                       <div className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 p-1 rounded-lg shadow-2xl">
-                        <span className="text-[9px] font-bold text-zinc-400 px-2 whitespace-nowrap">Satisfied? (Last change for 30d)</span>
+                        <span className="text-[9px] font-bold text-zinc-400 px-2 whitespace-nowrap">Are you sure? (Locked for 30d)</span>
                         <button 
                           onClick={handleApplyName}
                           className="bg-emerald-500 text-black px-2 py-0.5 rounded text-[9px] font-black uppercase"
@@ -3534,11 +3542,15 @@ const Settings = ({
           <div>
             <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">Strategy Checklist (Comma separated)</label>
             <textarea 
-              value={settings.strategyRules.join(', ')}
-              onChange={(e) => onUpdateSettings({ ...settings, strategyRules: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })}
-              className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-2 text-zinc-100 focus:ring-1 focus:ring-emerald-500 outline-none transition-all resize-none" 
+              value={tempStrategyRules}
+              onChange={(e) => setTempStrategyRules(e.target.value)}
+              onBlur={handleStrategyRulesBlur}
+              className={cn(
+                "w-full rounded-lg px-4 py-2 outline-none transition-all resize-none border",
+                settings.theme === 'light' ? "bg-white border-zinc-200 text-zinc-900 focus:ring-indigo-500" : "bg-black/20 border-zinc-800 text-zinc-100 focus:ring-emerald-500"
+              )}
               rows={3}
-              placeholder="Structure break, Liquidity sweep, FVG fill..."
+              placeholder="Rule 1: HTF Bias, Rule 2: 15m Displacement, Rule 3: 1m FVG..."
             />
           </div>
           <div>
@@ -3620,8 +3632,20 @@ const Plan = ({
   const [activeTab, setActiveTab] = useState<'blueprint' | 'playbook'>('blueprint');
   const [newRule, setNewRule] = useState("");
   const [isAddingPlaybookItem, setIsAddingPlaybookItem] = useState(false);
-  
-  // Playbook Item Form State
+  const [itemToDeleteId, setItemToDeleteId] = useState<string | null>(null);
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<Partial<PlaybookItem>>({});
+  const [confirmingLogicDeleteId, setConfirmingLogicDeleteId] = useState<string | null>(null);
+
+  const handleUpdatePlaybookItem = (id: string, updates: Partial<PlaybookItem>) => {
+    onUpdateSettings({
+      ...settings,
+      playbook: (settings.playbook || []).map(item => 
+        item.id === id ? { ...item, ...updates } : item
+      )
+    });
+    setEditingItemId(null);
+  };
   const [playbookForm, setPlaybookForm] = useState<Partial<PlaybookItem>>({
     title: "",
     content: "",
@@ -3714,6 +3738,14 @@ const Plan = ({
       checkpoints: (prev.checkpoints || []).filter((_, i) => i !== idx)
     }));
   };
+
+  const sortedPlaybook = useMemo(() => {
+    return [...(settings.playbook || [])].sort((a, b) => {
+      if (a.id === settings.activePlaybookId) return -1;
+      if (b.id === settings.activePlaybookId) return 1;
+      return 0;
+    });
+  }, [settings.playbook, settings.activePlaybookId]);
 
   return (
     <ScrollAnimatedSection className="max-w-5xl mx-auto py-4">
@@ -3876,7 +3908,7 @@ const Plan = ({
           >
             {/* Playbook List */}
             <div className="grid grid-cols-1 gap-6">
-              {(settings.playbook || []).map((item) => (
+              {sortedPlaybook.map((item) => (
                 <div 
                   key={item.id}
                   className={cn(
@@ -3908,23 +3940,43 @@ const Plan = ({
                     </div>
                     
                     <div className="flex items-center gap-4">
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); handleActivatePlaybook(item.id); }}
-                        className={cn(
-                          "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
-                          settings.activePlaybookId === item.id 
-                            ? "bg-zinc-800 text-zinc-400" 
-                            : "bg-emerald-500 text-black hover:scale-105"
-                        )}
-                      >
-                        {settings.activePlaybookId === item.id ? "Activated" : "Activate"}
-                      </button>
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); handleDeletePlaybookItem(item.id); }}
-                        className="p-2 text-zinc-600 hover:text-rose-400 transition-colors"
-                      >
-                        <Trash2 className="w-5 h-5" />
-                      </button>
+                      {itemToDeleteId === item.id ? (
+                        <div className="flex items-center gap-2 bg-zinc-950 border border-zinc-800 p-1.5 rounded-xl animate-in fade-in zoom-in duration-200">
+                          <span className="text-[10px] font-bold text-zinc-500 px-2">Delete?</span>
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); handleDeletePlaybookItem(item.id); setItemToDeleteId(null); }}
+                            className="bg-rose-500 text-white px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-rose-400 transition-colors"
+                          >
+                            Yes
+                          </button>
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); setItemToDeleteId(null); }}
+                            className="bg-zinc-800 text-zinc-400 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest hover:text-white transition-colors"
+                          >
+                            No
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); handleActivatePlaybook(item.id); }}
+                            className={cn(
+                              "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
+                              settings.activePlaybookId === item.id 
+                                ? "bg-zinc-800 text-zinc-400" 
+                                : "bg-emerald-500 text-black hover:scale-105"
+                            )}
+                          >
+                            {settings.activePlaybookId === item.id ? "Activated" : "Activate"}
+                          </button>
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); setItemToDeleteId(item.id); }}
+                            className="p-2 text-zinc-600 hover:text-rose-400 transition-colors"
+                          >
+                            <Trash2 className="w-5 h-5" />
+                          </button>
+                        </>
+                      )}
                       {expandedItems[item.id] ? <ChevronUp className="w-5 h-5 text-zinc-500" /> : <ChevronDown className="w-5 h-5 text-zinc-500" />}
                     </div>
                   </div>
@@ -3939,9 +3991,81 @@ const Plan = ({
                       >
                         <div className="p-8 grid grid-cols-1 lg:grid-cols-2 gap-10">
                           <div className="space-y-6">
-                            <div>
-                              <h5 className="text-[10px] font-black uppercase text-zinc-500 mb-3 tracking-widest">Strategy Logic</h5>
-                              <p className="text-sm text-zinc-300 leading-relaxed whitespace-pre-wrap">{item.content}</p>
+                            <div className="flex-1">
+                              <div className="flex items-center justify-between mb-3">
+                                <h5 className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Strategy Logic</h5>
+                                <div className="flex items-center gap-2">
+                                  {editingItemId === item.id ? (
+                                    <>
+                                      <button 
+                                        onClick={() => handleUpdatePlaybookItem(item.id, { content: editForm.content })}
+                                        className="text-[9px] font-black uppercase tracking-widest text-emerald-400 hover:text-emerald-300 transition-colors"
+                                      >
+                                        Save
+                                      </button>
+                                      <button 
+                                        onClick={() => setEditingItemId(null)}
+                                        className="text-[9px] font-black uppercase tracking-widest text-zinc-500 hover:text-zinc-400 transition-colors"
+                                      >
+                                        Cancel
+                                      </button>
+                                    </>
+                                  ) : (
+                                    <div className="flex items-center gap-3">
+                                      <button 
+                                        onClick={() => {
+                                          setEditingItemId(item.id);
+                                          setEditForm({ content: item.content });
+                                        }}
+                                        className="text-[9px] font-black uppercase tracking-widest text-indigo-400 hover:text-indigo-300 transition-colors flex items-center gap-1"
+                                      >
+                                        <Edit className="w-3 h-3" />
+                                        Edit
+                                      </button>
+                                      {confirmingLogicDeleteId === item.id ? (
+                                        <div className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 p-1 rounded-md animate-in fade-in zoom-in duration-200">
+                                          <span className="text-[8px] font-bold text-zinc-500 px-1">Clear Logic?</span>
+                                          <button 
+                                            onClick={() => {
+                                              handleUpdatePlaybookItem(item.id, { content: "" });
+                                              setConfirmingLogicDeleteId(null);
+                                            }}
+                                            className="bg-rose-500 text-white px-1.5 py-0.5 rounded text-[8px] font-black uppercase"
+                                          >
+                                            Yes
+                                          </button>
+                                          <button 
+                                            onClick={() => setConfirmingLogicDeleteId(null)}
+                                            className="bg-zinc-800 text-zinc-400 px-1.5 py-0.5 rounded text-[8px] font-black uppercase"
+                                          >
+                                            No
+                                          </button>
+                                        </div>
+                                      ) : (
+                                        <button 
+                                          onClick={() => setConfirmingLogicDeleteId(item.id)}
+                                          className="text-[9px] font-black uppercase tracking-widest text-rose-400 hover:text-rose-300 transition-colors flex items-center gap-1"
+                                        >
+                                          <X className="w-3 h-3" />
+                                          Remove
+                                        </button>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                              {editingItemId === item.id ? (
+                                <textarea 
+                                  value={editForm.content}
+                                  onChange={(e) => setEditForm({ ...editForm, content: e.target.value })}
+                                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-indigo-500 transition-colors resize-none"
+                                  rows={4}
+                                />
+                              ) : (
+                                <p className="text-sm text-zinc-300 leading-relaxed whitespace-pre-wrap">
+                                  {item.content || <span className="text-zinc-600 italic">No logic defined yet. Click edit to add your narrative.</span>}
+                                </p>
+                              )}
                             </div>
                           </div>
                           
@@ -4415,6 +4539,7 @@ export default function App() {
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [trades, setTrades] = useState<Trade[]>([]);
   const [settings, setSettings] = useState<UserSettings>({
     profileName: 'Alex Rivera',
@@ -4778,12 +4903,26 @@ export default function App() {
   return (
     <div className={cn(
       "flex flex-col h-screen font-sans overflow-hidden transition-colors duration-500",
-      settings.theme === 'light' ? "light bg-zinc-50 text-zinc-900" : "bg-[#0A0A0B] text-zinc-200"
+      settings.theme === 'light' ? "light bg-zinc-50 text-zinc-900" : 
+      settings.theme === 'midnight' ? "bg-[#020617] text-zinc-200" :
+      settings.theme === 'obsidian' ? "bg-black text-zinc-200" :
+      settings.theme === 'slate' ? "bg-[#18181b] text-zinc-200" :
+      settings.theme === 'forest' ? "bg-[#022c22] text-zinc-200" :
+      settings.theme === 'abyss' ? "bg-[#0f172a] text-zinc-200" :
+      settings.theme === 'carbon' ? "bg-[#171717] text-zinc-200" :
+      "bg-[#0A0A0B] text-zinc-200"
     )}>
       {/* Liquid Glass Header */}
       <header className={cn(
         "fixed top-0 left-0 right-0 h-16 z-50 px-6 sm:px-12 flex items-center justify-between backdrop-blur-xl border-b transition-all shadow-xl",
-        settings.theme === 'light' ? "bg-white/40 border-zinc-200/50 shadow-emerald-500/5" : "bg-zinc-950/40 border-white/5 shadow-black/37"
+        settings.theme === 'light' ? "bg-white/40 border-zinc-200/50 shadow-emerald-500/5" : 
+        settings.theme === 'midnight' ? "bg-blue-950/40 border-blue-900/20 shadow-black/37" :
+        settings.theme === 'obsidian' ? "bg-black/40 border-white/5 shadow-black/37" :
+        settings.theme === 'slate' ? "bg-zinc-900/40 border-white/5 shadow-black/37" :
+        settings.theme === 'forest' ? "bg-emerald-950/40 border-emerald-900/20 shadow-black/37" :
+        settings.theme === 'abyss' ? "bg-slate-900/40 border-slate-800/20 shadow-black/37" :
+        settings.theme === 'carbon' ? "bg-zinc-900/40 border-zinc-800/20 shadow-black/37" :
+        "bg-zinc-950/40 border-white/5 shadow-black/37"
       )}>
         <div className="flex items-center gap-4">
           <button 
@@ -4860,19 +4999,56 @@ export default function App() {
               {settings.profileName.split(' ').map(n => n[0]).join('')}
             </div>
           </div>
-          <button
-            onClick={() => {
-              setActiveTab('settings');
-              handleLogout();
-            }}
-            className={cn(
-              "p-2 rounded-xl border flex items-center justify-center transition-all hover:bg-rose-500 hover:text-white group",
-              settings.theme === 'light' ? "bg-white border-zinc-200 text-zinc-500" : "bg-zinc-900 border-white/5 text-zinc-400"
-            )}
-            title="Log Out"
-          >
-            <LogOut className="w-4 h-4" />
-          </button>
+          <div className="relative">
+            <button
+              onClick={() => setShowLogoutConfirm(!showLogoutConfirm)}
+              className={cn(
+                "p-2 rounded-xl border flex items-center justify-center transition-all group",
+                showLogoutConfirm 
+                  ? "bg-rose-500 text-white border-rose-500" 
+                  : (settings.theme === 'light' ? "bg-white border-zinc-200 text-zinc-500 hover:bg-rose-50 hover:text-rose-500" : "bg-zinc-900 border-white/5 text-zinc-400 hover:bg-rose-500/10 hover:text-rose-400")
+              )}
+              title="Log Out"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+
+            <AnimatePresence>
+              {showLogoutConfirm && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                  className={cn(
+                    "absolute right-0 top-full mt-2 w-48 p-4 rounded-2xl border shadow-2xl z-50 animate-in fade-in zoom-in duration-200",
+                    settings.theme === 'light' ? "bg-white border-zinc-200" : "bg-zinc-900 border-zinc-800"
+                  )}
+                >
+                  <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-3">Confirm Logout?</p>
+                  <div className="flex flex-col gap-2">
+                    <button 
+                      onClick={() => {
+                        handleLogout();
+                        setShowLogoutConfirm(false);
+                      }}
+                      className="w-full py-2 bg-rose-500 hover:bg-rose-400 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-rose-900/20"
+                    >
+                      Yes, Logout
+                    </button>
+                    <button 
+                      onClick={() => setShowLogoutConfirm(false)}
+                      className={cn(
+                        "w-full py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
+                        settings.theme === 'light' ? "bg-zinc-100 text-zinc-600 hover:bg-zinc-200" : "bg-zinc-800 text-zinc-400 hover:text-white"
+                      )}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         </div>
       </header>
 
