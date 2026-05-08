@@ -41,8 +41,87 @@ import {
   Edit,
   Chrome,
   CheckCircle2,
-  Zap
+  Zap,
+  Globe,
+  Star,
+  Sparkles,
+  User as UserIcon,
+  Users,
+  Info,
+  Calendar as CalendarIcon,
+  Zap as ZapIcon,
+  Target as TargetIcon,
+  Clock,
+  LayoutGrid,
+  Bell,
+  RotateCw,
+  ShieldCheck
 } from 'lucide-react';
+
+const NewFeatureNotification = () => {
+  const [isVisible, setIsVisible] = useState(false);
+
+  useEffect(() => {
+    const hasSeenUpdate = localStorage.getItem('zync_seen_v2_update');
+    if (!hasSeenUpdate) {
+      const timer = setTimeout(() => setIsVisible(true), 1500);
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
+  const dismissNotification = () => {
+    setIsVisible(false);
+    localStorage.setItem('zync_seen_v2_update', 'true');
+  };
+
+  return (
+    <AnimatePresence>
+      {isVisible && (
+        <motion.div
+          initial={{ opacity: 0, x: -100, y: -20, scale: 0.8 }}
+          animate={{ opacity: 1, x: 0, y: 0, scale: 1 }}
+          exit={{ opacity: 0, x: -100, scale: 0.8 }}
+          className="fixed top-24 left-8 z-[100] max-w-sm"
+        >
+          <div className="bg-zinc-950/90 backdrop-blur-3xl border border-emerald-500/30 rounded-[2.5rem] p-6 shadow-[0_25px_60px_rgba(16,185,129,0.15)] flex items-start gap-5 relative overflow-hidden group">
+            <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:scale-125 transition-transform duration-700">
+               <Zap className="w-20 h-20 text-emerald-500" />
+            </div>
+            <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 flex items-center justify-center shrink-0 border border-emerald-500/20 relative z-10 shadow-inner">
+              <Sparkles className="w-7 h-7 text-emerald-500 animate-pulse" />
+            </div>
+            <div className="flex-1 relative z-10">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="px-2.5 py-1 bg-emerald-500/20 text-emerald-500 rounded-lg text-[9px] font-black uppercase tracking-widest border border-emerald-500/20">System Update</span>
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+              </div>
+              <h4 className="text-white font-black text-base uppercase tracking-tighter mb-1.5">Economics & Markets Live</h4>
+              <p className="text-zinc-500 text-[11px] font-medium leading-relaxed uppercase tracking-tight opacity-80">
+                Institutional Data Streams and Global Economic Calendars are now synchronized to your dashboard.
+              </p>
+              <div className="mt-5 flex items-center gap-3">
+                 <button 
+                   onClick={dismissNotification}
+                   className="px-4 py-2 bg-emerald-500 text-black text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-emerald-400 transition-all hover:scale-105 active:scale-95 shadow-[0_10px_20px_rgba(16,185,129,0.2)]"
+                 >
+                   Got it
+                 </button>
+                 <span className="text-[8px] font-black text-zinc-700 uppercase tracking-widest border-l border-zinc-800/50 pl-3">v2.4.0 Alpha Sync</span>
+              </div>
+            </div>
+            <button 
+              onClick={dismissNotification}
+              className="absolute top-4 right-4 p-2 hover:bg-white/5 rounded-full transition-colors text-zinc-500 hover:text-white"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+};
+import { GoogleGenAI } from "@google/genai";
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   LineChart, 
@@ -56,6 +135,8 @@ import {
   Area,
   BarChart,
   Bar,
+  ScatterChart,
+  Scatter,
   Cell,
   PieChart,
   Pie
@@ -68,6 +149,8 @@ import {
   startOfDay, 
   eachDayOfInterval, 
   subDays, 
+  addDays,
+  addWeeks,
   isSameDay,
   startOfMonth,
   endOfMonth,
@@ -1083,6 +1166,7 @@ const Dashboard = ({ stats, trades, onTabChange, profileName, currency, hidePnL,
   const [showExportModal, setShowExportModal] = useState(false);
   const [selectedRange, setSelectedRange] = useState('All Time');
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
+  const [chartType, setChartType] = useState<'line' | 'ogive' | 'scatter' | 'cubic' | 'bar'>('line');
   const [selectedTrade, setSelectedTrade] = useState<Trade | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -1121,15 +1205,32 @@ const Dashboard = ({ stats, trades, onTabChange, profileName, currency, hidePnL,
   };
   const equityData = useMemo(() => {
     let balance = startingBalance;
+    let cumulativePnL = 0;
     const sortedAsc = [...trades].sort((a, b) => new Date(a.entryDate).getTime() - new Date(b.entryDate).getTime());
-    return sortedAsc.map(t => {
+    
+    // Start from Zero
+    const data = [{
+      date: 'Start',
+      balance: startingBalance,
+      pnl: 0,
+      cumulativePnL: 0,
+      index: 0
+    }];
+
+    sortedAsc.forEach((t, idx) => {
       balance += t.pnl;
-      return {
+      cumulativePnL += t.pnl;
+      data.push({
         date: format(parseISO(t.entryDate), 'MMM dd'),
-        balance
-      };
+        balance,
+        pnl: t.pnl,
+        cumulativePnL,
+        index: idx + 1
+      });
     });
-  }, [trades]);
+
+    return data;
+  }, [trades, startingBalance]);
 
   return (
     <div className="space-y-8">
@@ -1176,48 +1277,89 @@ const Dashboard = ({ stats, trades, onTabChange, profileName, currency, hidePnL,
 
       <ScrollAnimatedSection delay={0.2} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 bg-zinc-900 border border-zinc-800 p-5 rounded-xl">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold">Equity Curve</h3>
-            <div className="flex gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-              <span className="text-[10px] text-zinc-500 uppercase font-bold">Performance</span>
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                <BarChart3 className="w-4 h-4 text-emerald-500" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-white">Performance Analytics</h3>
+                <p className="text-[10px] text-zinc-500 uppercase font-bold tracking-widest">Equity & P&L Curve</p>
+              </div>
+            </div>
+            
+            <div className="flex bg-zinc-950 p-1 rounded-xl border border-zinc-800">
+              {[
+                { id: 'line', label: 'Line' },
+                { id: 'ogive', label: 'Ogive' },
+                { id: 'scatter', label: 'Scatter' },
+                { id: 'cubic', label: 'Cubic' },
+                { id: 'bar', label: 'Bar' }
+              ].map(type => (
+                <button
+                  key={type.id}
+                  onClick={() => setChartType(type.id as any)}
+                  className={cn(
+                    "px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-tighter transition-all",
+                    chartType === type.id ? "bg-zinc-800 text-white shadow-lg" : "text-zinc-600 hover:text-zinc-400"
+                  )}
+                >
+                  {type.label}
+                </button>
+              ))}
             </div>
           </div>
-          <div className="h-48 w-full">
+
+          <div className="h-64 w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={equityData}>
-                <defs>
-                  <linearGradient id="colorBalance" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.2}/>
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="4" stroke="#262626" vertical={false} />
-                <XAxis 
-                  dataKey="date" 
-                  stroke="#52525b" 
-                  fontSize={10}
-                  tickLine={false}
-                  axisLine={false}
-                />
-                <YAxis 
-                  stroke="#52525b" 
-                  fontSize={10}
-                  tickLine={false}
-                  axisLine={false}
-                />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#09090b', border: '1px solid #27272a', borderRadius: '8px' }}
-                />
-                <Area 
-                  type="monotone" 
-                  dataKey="balance" 
-                  stroke="#10b981" 
-                  strokeWidth={2}
-                  fillOpacity={1} 
-                  fill="url(#colorBalance)" 
-                />
-              </AreaChart>
+              {chartType === 'bar' ? (
+                <BarChart data={equityData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#262626" vertical={false} />
+                  <XAxis dataKey="date" stroke="#52525b" fontSize={10} tickLine={false} axisLine={false} />
+                  <YAxis stroke="#52525b" fontSize={10} tickLine={false} axisLine={false} />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: '#09090b', border: '1px solid #27272a', borderRadius: '12px' }}
+                    itemStyle={{ color: '#10b981', fontSize: '12px' }}
+                  />
+                  <Bar dataKey="pnl" fill="#10b981" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              ) : chartType === 'scatter' ? (
+                <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
+                  <XAxis type="number" dataKey="index" name="Trade #" stroke="#52525b" fontSize={10} />
+                  <YAxis type="number" dataKey="cumulativePnL" name="PnL" stroke="#52525b" fontSize={10} />
+                  <Tooltip 
+                    cursor={{ strokeDasharray: '3 3' }}
+                    contentStyle={{ backgroundColor: '#09090b', border: '1px solid #27272a', borderRadius: '12px' }}
+                  />
+                  <Scatter name="PnL Progression" data={equityData} fill="#10b981" />
+                </ScatterChart>
+              ) : (
+                <AreaChart data={equityData}>
+                  <defs>
+                    <linearGradient id="colorBalance" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.2}/>
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#262626" vertical={false} />
+                  <XAxis dataKey="date" stroke="#52525b" fontSize={10} tickLine={false} axisLine={false} />
+                  <YAxis stroke="#52525b" fontSize={10} tickLine={false} axisLine={false} />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: '#09090b', border: '1px solid #27272a', borderRadius: '12px' }}
+                    itemStyle={{ color: '#10b981', fontSize: '12px' }}
+                  />
+                  <Area 
+                    type={chartType === 'cubic' ? "monotone" : "linear"} 
+                    dataKey={chartType === 'ogive' ? "cumulativePnL" : "balance"} 
+                    stroke="#10b981" 
+                    strokeWidth={2}
+                    fillOpacity={1} 
+                    fill="url(#colorBalance)" 
+                    dot={chartType === 'line'}
+                  />
+                </AreaChart>
+              )}
             </ResponsiveContainer>
           </div>
         </div>
@@ -4274,6 +4416,1603 @@ const Plan = ({
   );
 };
 
+const TradingViewWidget = ({ symbol, height = "100%", autosize = true }: { symbol: string, height?: string | number, autosize?: boolean }) => {
+  const container = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!container.current) return;
+    const script = document.createElement("script");
+    script.src = "https://s3.tradingview.com/external-embedding/embed-widget-mini-symbol-overview.js";
+    script.type = "text/javascript";
+    script.async = true;
+    script.innerHTML = JSON.stringify({
+      "symbol": symbol.includes(':') ? symbol : (['BTCUSD', 'ETHUSD'].includes(symbol) ? `BINANCE:${symbol}` : `NASDAQ:${symbol}`),
+      "width": "100%",
+      "height": height,
+      "locale": "en",
+      "dateRange": "12M",
+      "colorTheme": "dark",
+      "isTransparent": true,
+      "autosize": autosize,
+      "largeChartUrl": ""
+    });
+    container.current.appendChild(script);
+    return () => {
+      if (container.current) {
+        container.current.innerHTML = '';
+      }
+    };
+  }, [symbol, height, autosize]);
+
+  return <div ref={container} className="w-full h-full" />;
+};
+
+const AINewsAnalysis = ({ news, includeFutures = true }: { news: any[], includeFutures?: boolean }) => {
+  const [analysis, setAnalysis] = useState<{ 
+    sentiment: 'bullish' | 'bearish' | 'neutral', 
+    confidence: number, 
+    reasoning: string,
+    scenarios: { condition: string, prediction: string, bias: string }[],
+    outcomes: { label: string, probability: number, color: string }[]
+  } | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+
+  const analyzeNews = async () => {
+    setLoading(true);
+    try {
+      const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
+      
+      const prompt = `Act as a senior Quantitative Analyst. Analyze the following global news events for the current week and provide a deep market sentiment analysis${includeFutures ? ' specifically focusing on Indices, Commodities, and Futures (CME/CBOT)' : ''}. 
+      
+      CRITICAL: You MUST also provide EXACTLY 3 scenarios for the highest impact news item: 
+      1. Above Forecast -> Very Bullish
+      2. On Forecast -> Ranging
+      3. Below Forecast -> Very Bearish
+
+      Provide a prediction market distribution (Bullish, Neutral, Bearish probabilities summing to 100%).
+
+      Respond ONLY in JSON format: { 
+        "sentiment": "bullish" | "bearish" | "neutral", 
+        "confidence": number (0-100), 
+        "reasoning": "short professional explanation",
+        "scenarios": [
+          { "condition": "Above Forecast", "prediction": "Very Bullish", "bias": "Expansion" },
+          { "condition": "On Forecast", "prediction": "Ranging", "bias": "Consolidation" },
+          { "condition": "Below Forecast", "prediction": "Very Bearish", "bias": "Structural Break" }
+        ],
+        "outcomes": [
+          { "label": "Bullish", "probability": number, "color": "emerald" },
+          { "label": "Neutral", "probability": number, "color": "zinc" },
+          { "label": "Bearish", "probability": number, "color": "rose" }
+        ]
+      }.
+      News Events: ${JSON.stringify(news)}`;
+
+      const response = await genAI.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: prompt
+      });
+      
+      const text = response.text || '';
+      const cleanedText = text.replace(/```json|```/g, '').trim();
+      setAnalysis(JSON.parse(cleanedText));
+      setLastUpdated(new Date().toLocaleTimeString());
+    } catch (e) {
+      console.error(e);
+      setAnalysis({ 
+        sentiment: 'neutral', 
+        confidence: 50, 
+        reasoning: "Horizontal consolidation expected across major futures contracts.",
+        scenarios: [
+          { condition: "Above Forecast", prediction: "Bullish", bias: "Expansion" },
+          { condition: "On Forecast", prediction: "Ranging", bias: "Neutral" },
+          { condition: "Below Forecast", prediction: "Bearish", bias: "Reversal" }
+        ],
+        outcomes: [
+          { label: "Bullish", probability: 30, color: "emerald" },
+          { label: "Neutral", probability: 40, color: "zinc" },
+          { label: "Bearish", probability: 30, color: "rose" }
+        ]
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (news.length > 0) analyzeNews();
+  }, [news]);
+
+  return (
+    <div className="bg-zinc-950 border border-zinc-800 rounded-3xl p-8 backdrop-blur-xl group hover:border-emerald-500/20 transition-all shadow-xl">
+      <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-white/5 flex items-center justify-center border border-white/10">
+            <ZapIcon className="w-5 h-5 text-emerald-500" />
+          </div>
+          <div>
+            <h4 className="text-sm font-black text-white uppercase tracking-[0.2em]">AI ALPHA PLAYBOOK</h4>
+            <div className="flex items-center gap-2">
+              <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">{includeFutures ? 'Futures & Global Bias' : 'Market Sentiment'}</p>
+              {lastUpdated && <span className="text-[8px] text-zinc-700 font-black tracking-widest uppercase">• Reflected: {lastUpdated}</span>}
+            </div>
+          </div>
+        </div>
+        {loading ? (
+          <div className="flex items-center gap-2">
+            <span className="text-[8px] font-black text-emerald-500 uppercase tracking-widest animate-pulse">Computing Alpha</span>
+            <div className="w-4 h-4 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : (
+          <button 
+            onClick={analyzeNews}
+            className="p-2 hover:bg-white/5 rounded-lg transition-colors border border-transparent hover:border-white/10"
+          >
+            <RotateCw className="w-4 h-4 text-zinc-500 hover:text-emerald-500" />
+          </button>
+        )}
+      </div>
+
+      {analysis && (
+        <div className="space-y-8">
+          {/* Prediction Market Visual */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h5 className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em]">Prediction Market Distribution</h5>
+              <div className="flex items-center gap-4">
+                {analysis.outcomes?.map(o => (
+                  <div key={o.label} className="flex items-center gap-1.5">
+                    <div className={cn("w-1.5 h-1.5 rounded-full", 
+                      o.color === 'emerald' ? "bg-emerald-500" : o.color === 'rose' ? "bg-rose-500" : "bg-zinc-500"
+                    )} />
+                    <span className="text-[9px] font-black text-zinc-400 uppercase tracking-tighter">{o.label} {o.probability}%</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="h-4 bg-zinc-900 rounded-xl overflow-hidden flex border border-zinc-800 shadow-inner">
+              {analysis.outcomes?.map((o, i) => (
+                <div
+                  key={i}
+                  style={{ width: `${o.probability}%` }}
+                  className={cn(
+                    "h-full relative group transition-all duration-1000",
+                    o.color === 'emerald' ? "bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]" : o.color === 'rose' ? "bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.3)]" : "bg-zinc-700"
+                  )}
+                />
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            <div className="flex-1">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Main Sentiment Bias</span>
+                <span className={cn(
+                  "text-[10px] font-black uppercase px-2 py-0.5 rounded bg-zinc-900 border",
+                  analysis.sentiment === 'bullish' ? "text-emerald-500 border-emerald-500/20" : analysis.sentiment === 'bearish' ? "text-rose-500 border-rose-500/20" : "text-zinc-400 border-zinc-800"
+                )}>
+                  {analysis.sentiment} ({analysis.confidence}% Confidence)
+                </span>
+              </div>
+              <div className="h-2.5 bg-zinc-900 rounded-full overflow-hidden border border-zinc-800">
+                <motion.div 
+                  initial={{ width: 0 }}
+                  whileInView={{ width: `${analysis.confidence}%` }}
+                  viewport={{ once: true }}
+                  className={cn(
+                    "h-full rounded-full transition-all duration-1000",
+                    analysis.sentiment === 'bullish' ? "bg-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.4)]" : analysis.sentiment === 'bearish' ? "bg-rose-500 shadow-[0_0_20px_rgba(244,63,94,0.4)]" : "bg-zinc-500 shadow-lg"
+                  )}
+                />
+              </div>
+            </div>
+            
+            <div className="bg-zinc-900/40 p-5 rounded-2xl border border-zinc-800/50">
+               <div className="flex items-start gap-4">
+                  <div className="p-2 bg-indigo-500/10 rounded-lg shrink-0">
+                    <Info className="w-4 h-4 text-indigo-400" />
+                  </div>
+                  <p className="text-xs font-medium text-zinc-400 leading-relaxed italic">
+                    "{analysis.reasoning}"
+                  </p>
+               </div>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <h5 className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em] mb-4">Leading Outcome Scenarios</h5>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {analysis.scenarios.map((s, i) => (
+                <div key={i} className="p-4 bg-zinc-950 border border-zinc-800 rounded-2xl group hover:border-white/20 transition-all hover:bg-zinc-900/50 relative overflow-hidden">
+                  <div className="absolute top-0 right-0 p-2 opacity-5 pointer-events-none group-hover:scale-110 transition-transform text-white">
+                    <TargetIcon className="w-12 h-12" />
+                  </div>
+                  <span className="text-[8px] font-black text-zinc-500 uppercase tracking-widest block mb-2">{s.condition}</span>
+                  <div className={cn(
+                    "text-xs font-black uppercase mb-1",
+                    s.prediction.includes('Bullish') ? "text-emerald-500" : s.prediction.includes('Bearish') ? "text-rose-500" : "text-zinc-400"
+                  )}>
+                    {s.prediction}
+                  </div>
+                  <div className="text-[9px] font-bold text-zinc-600 uppercase tracking-tight">{s.bias}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const BankForecast = () => {
+  const [selectedAsset, setSelectedAsset] = useState('ES1!');
+  const [activeDay, setActiveDay] = useState(format(new Date(), 'EEEE'));
+  const [timezone, setTimezone] = useState<'EST' | 'PHT'>('EST');
+  const [expandedNewsId, setExpandedNewsId] = useState<number | null>(null);
+  
+  const convertTime = (timeEST: string, targetTz: 'EST' | 'PHT') => {
+    if (targetTz === 'EST') return timeEST;
+    // Assuming EST to PHT is +12 or +13. In May 2026 it's +12.
+    const [time, period] = timeEST.split(' ');
+    let [hours, minutes] = time.split(':').map(Number);
+    if (period === 'PM' && hours !== 12) hours += 12;
+    if (period === 'AM' && hours === 12) hours = 0;
+    
+    // Add 12 hours
+    const phtHours = (hours + 12) % 24;
+    const phtPeriod = phtHours >= 12 ? 'PM' : 'AM';
+    const displayHours = phtHours % 12 || 12;
+    return `${displayHours}:${minutes.toString().padStart(2, '0')} ${phtPeriod}`;
+  };
+
+  const weeklyNews = useMemo(() => [
+    {
+      day: 'Monday',
+      events: [
+        { 
+          id: 101, 
+          time: '08:30 AM', 
+          currency: 'USD', 
+          event: 'Empire State Mfg Index', 
+          impact: 'low', 
+          volatility: 'Minor Effect',
+          duration: '4-6 Hours',
+          status: 'Upcoming',
+          keyPoint: 'Manufacturing health proxy',
+          forecast: '-14.0', 
+          previous: '-20.9', 
+          desc: "Survey of business conditions in NY." 
+        },
+        { 
+          id: 102, 
+          time: '11:30 AM', 
+          currency: 'USD', 
+          event: '3-Month Bill Auction', 
+          impact: 'low', 
+          volatility: 'Minor Effect',
+          duration: '1-2 Hours',
+          status: 'Upcoming',
+          keyPoint: 'Short-term yield tracking',
+          forecast: '5.24%', 
+          previous: '5.25%', 
+          desc: "Government debt auction results." 
+        }
+      ]
+    },
+    {
+      day: 'Tuesday',
+      events: [
+        { 
+          id: 201, 
+          time: '08:30 AM', 
+          currency: 'USD', 
+          event: 'CPI m/m', 
+          impact: 'high', 
+          volatility: 'Major Effect',
+          duration: 'Full Day',
+          status: 'Upcoming',
+          keyPoint: 'Core inflation pressure',
+          forecast: '0.3%', 
+          previous: '0.4%', 
+          desc: "Primary indicator of consumer inflation." 
+        },
+        { 
+          id: 202, 
+          time: '08:30 AM', 
+          currency: 'CAD', 
+          event: 'CPI m/m', 
+          impact: 'high', 
+          volatility: 'Major Effect',
+          duration: '8-12 Hours',
+          status: 'Upcoming',
+          keyPoint: 'BoC policy driver',
+          forecast: '0.2%', 
+          previous: '0.1%', 
+          desc: "Core inflation tracking for CAD." 
+        }
+      ]
+    },
+    {
+      day: 'Wednesday',
+      events: [
+        { 
+          id: 301, 
+          time: '08:30 AM', 
+          currency: 'USD', 
+          event: 'Retail Sales m/m', 
+          impact: 'high', 
+          volatility: 'Major Effect',
+          duration: '6-8 Hours',
+          status: 'Upcoming',
+          keyPoint: 'Consumer demand health',
+          forecast: '0.4%', 
+          previous: '0.6%', 
+          desc: "Measure of consumer spending." 
+        },
+        { 
+          id: 302, 
+          time: '10:30 AM', 
+          currency: 'USD', 
+          event: 'Crude Oil Inventories', 
+          impact: 'medium', 
+          volatility: 'Moderate Effect',
+          duration: '4 Hours',
+          status: 'Upcoming',
+          keyPoint: 'Energy supply shift',
+          forecast: '1.2M', 
+          previous: '-1.5M', 
+          desc: "Weekly supply of commercial oil." 
+        }
+      ]
+    },
+    {
+      day: 'Thursday',
+      events: [
+        { 
+          id: 401, 
+          time: '08:30 AM', 
+          currency: 'USD', 
+          event: 'Philly Fed Mfg Index', 
+          impact: 'medium', 
+          volatility: 'Moderate Effect',
+          duration: '4-6 Hours',
+          status: 'Upcoming',
+          keyPoint: 'Regional business trends',
+          forecast: '1.5', 
+          previous: '4.2', 
+          desc: "Manufacturing conditions in Philadelphia." 
+        },
+        { 
+          id: 402, 
+          time: '08:30 AM', 
+          currency: 'USD', 
+          event: 'Unemployment Claims', 
+          impact: 'high', 
+          volatility: 'Major Effect',
+          duration: '6-10 Hours',
+          status: 'Upcoming',
+          keyPoint: 'Labor market tightness',
+          forecast: '215K', 
+          previous: '210K', 
+          desc: "Weekly first-time job seekers." 
+        }
+      ]
+    },
+    {
+      day: 'Friday',
+      events: [
+        { 
+          id: 501, 
+          time: '10:00 AM', 
+          currency: 'USD', 
+          event: 'Consumer Sentiment', 
+          impact: 'medium', 
+          volatility: 'Moderate Effect',
+          duration: '4 Hours',
+          status: 'Upcoming',
+          keyPoint: 'Future spending outlook',
+          forecast: '78.5', 
+          previous: '79.4', 
+          desc: "Confidence in overall economic health." 
+        },
+        { 
+          id: 502, 
+          time: '12:00 PM', 
+          currency: 'EUR', 
+          event: 'ECB President Lagarde Speaks', 
+          impact: 'high', 
+          volatility: 'Major Effect',
+          duration: 'Variable',
+          status: 'Upcoming',
+          keyPoint: 'Monetary policy clues',
+          forecast: '-', 
+          previous: '-', 
+          desc: "Critical clues for EUR monetary policy." 
+        }
+      ]
+    }
+  ], []);
+
+    const currentNews = useMemo(() => {
+    const rawNews = weeklyNews.find(w => w.day === activeDay)?.events || [];
+    const now = new Date();
+    const currentDay = format(now, 'EEEE');
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+    const currentDayIdx = days.indexOf(currentDay);
+    const activeDayIdx = days.indexOf(activeDay);
+
+    return rawNews.map(news => {
+      let status = 'Upcoming';
+      if (activeDayIdx < currentDayIdx) {
+        status = 'Released';
+      } else if (activeDayIdx === currentDayIdx) {
+        const [h, m_ap] = news.time.split(':');
+        const [m, ap] = m_ap.split(' ');
+        let eventHour = parseInt(h);
+        if (ap === 'PM' && eventHour !== 12) eventHour += 12;
+        if (ap === 'AM' && eventHour === 12) eventHour = 0;
+        const eventMinute = parseInt(m);
+        
+        const eventTime = new Date();
+        eventTime.setHours(eventHour, eventMinute, 0, 0);
+        
+        const diffInMinutes = (now.getTime() - eventTime.getTime()) / (1000 * 60);
+        
+        if (diffInMinutes > 60) status = 'Released';
+        else if (diffInMinutes >= 0) status = 'In Focus';
+        else status = 'Upcoming';
+      }
+      return { ...news, status };
+    });
+  }, [activeDay, weeklyNews]);
+
+  const getCurrencyLogo = (curr: string) => {
+    const logos: Record<string, string> = {
+      'USD': 'https://flagpedia.net/data/flags/w580/us.png',
+      'EUR': 'https://flagpedia.net/data/flags/w580/eu.png',
+      'GBP': 'https://flagpedia.net/data/flags/w580/gb.png',
+      'JPY': 'https://flagpedia.net/data/flags/w580/jp.png',
+      'CAD': 'https://flagpedia.net/data/flags/w580/ca.png'
+    };
+    return logos[curr] || 'https://flagpedia.net/data/flags/w580/un.png';
+  };
+
+  return (
+    <div className="mb-16 space-y-8">
+      <div className="flex flex-col lg:flex-row gap-8">
+        {/* Weekly News Column */}
+        <div className="flex-1 bg-zinc-900 border border-zinc-800 rounded-[2.5rem] p-8 overflow-hidden relative shadow-2xl shadow-black/50">
+          <div className="absolute top-0 right-0 p-12 opacity-[0.03] pointer-events-none rotate-12">
+            <CalendarIcon className="w-64 h-64" />
+          </div>
+          
+          <div className="flex flex-col md:flex-row md:items-center justify-between mb-10 relative z-10 gap-6">
+            <div>
+              <div className="flex items-center gap-3 mb-1">
+                <h3 className="text-2xl font-black text-white tracking-tighter uppercase italic">Institutional Bank Forecast</h3>
+                <div className="px-2 py-0.5 bg-indigo-500/10 text-indigo-400 rounded text-[8px] font-black uppercase tracking-widest border border-indigo-500/20">Weekly View</div>
+              </div>
+              <p className="text-[10px] text-zinc-500 font-black uppercase tracking-[0.2em]">Monitoring May 04 — May 10, 2026</p>
+            </div>
+            
+              <div className="flex bg-black/40 p-1 rounded-2xl border border-white/5 backdrop-blur-md overflow-x-auto no-scrollbar w-full md:w-auto">
+                <button 
+                  onClick={() => setTimezone('EST')}
+                  className={cn(
+                    "px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all shrink-0",
+                    timezone === 'EST' ? "bg-indigo-500 text-white" : "text-zinc-500 hover:text-zinc-300"
+                  )}
+                >
+                  EST
+                </button>
+                <button 
+                  onClick={() => setTimezone('PHT')}
+                  className={cn(
+                    "px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all shrink-0",
+                    timezone === 'PHT' ? "bg-indigo-500 text-white" : "text-zinc-500 hover:text-zinc-300"
+                  )}
+                >
+                  PHT
+                </button>
+              </div>
+            </div>
+            
+            <div className="flex bg-black/40 p-1 rounded-2xl border border-white/5 backdrop-blur-md overflow-x-auto no-scrollbar w-full md:w-auto">
+              {weeklyNews.map(w => (
+                <button
+                  key={w.day}
+                  onClick={() => setActiveDay(w.day)}
+                  className={cn(
+                    "px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all shrink-0",
+                    activeDay === w.day ? "bg-white text-black shadow-xl" : "text-zinc-500 hover:text-zinc-300"
+                  )}
+                >
+                  {w.day.substring(0, 3)}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-6 relative z-10">
+            <div className="flex items-center gap-2 mb-4">
+              <span className="w-2 h-2 rounded-full bg-indigo-500 animate-ping" />
+              <span className="text-[8px] font-black text-indigo-500 uppercase tracking-widest text-shadow-glow">Live Institutional Feed Active</span>
+            </div>
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeDay}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="space-y-4"
+              >
+                {currentNews.map((news) => (
+                  <motion.div 
+                    key={news.id}
+                    layout
+                    initial={false}
+                    className={cn(
+                      "group bg-black/40 border border-zinc-800/80 hover:border-indigo-500/40 rounded-3xl p-6 transition-all shadow-xl",
+                      expandedNewsId === news.id && "border-indigo-500/50 bg-zinc-900/40 shadow-indigo-500/10"
+                    )}
+                  >
+                    <div className="flex flex-col gap-6">
+                      <div className="flex items-center justify-between">
+                         <div className="flex items-center gap-4">
+                            <div className="relative shrink-0">
+                              <img src={getCurrencyLogo(news.currency)} alt={news.currency} className="w-12 h-12 rounded-2xl object-cover border-2 border-zinc-900 shadow-2xl" />
+                              <div className={cn(
+                                "absolute -top-1 -right-1 w-5 h-5 rounded-full border-2 border-zinc-950 shadow-lg",
+                                news.impact === 'high' ? "bg-rose-500" : news.impact === 'medium' ? "bg-orange-500" : "bg-emerald-500"
+                              )} />
+                            </div>
+                            <div>
+                               <div className="flex items-center gap-2 mb-0.5">
+                                 <span className="text-[10px] font-black text-white uppercase tracking-widest">{convertTime(news.time, timezone)}</span>
+                                 <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest">{timezone}</span>
+                                 <div className="w-1.5 h-1.5 rounded-full bg-zinc-800" />
+                                 <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">{news.volatility}</span>
+                               </div>
+                               <h4 className="text-lg font-black text-white group-hover:text-indigo-400 transition-colors uppercase tracking-tighter">{news.event}</h4>
+                            </div>
+                         </div>
+
+                         <button 
+                           onClick={() => setExpandedNewsId(expandedNewsId === news.id ? null : news.id)}
+                           className={cn(
+                             "w-10 h-10 rounded-xl bg-zinc-900 border border-white/5 flex items-center justify-center transition-all",
+                             expandedNewsId === news.id ? "bg-white text-black scale-110" : "hover:bg-white hover:text-black"
+                           )}
+                         >
+                           {expandedNewsId === news.id ? <X className="w-4 h-4" /> : <Info className="w-4 h-4" />}
+                         </button>
+                      </div>
+
+                      <AnimatePresence>
+                        {expandedNewsId === news.id && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            className="overflow-hidden"
+                          >
+                            <div className="space-y-6 pt-6 border-t border-white/5">
+                              <div className="space-y-3">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                                    <ShieldCheck className="w-4 h-4 text-emerald-500" />
+                                  </div>
+                                  <span className="text-[10px] font-black text-white uppercase tracking-widest">Institutional Bank Forecast Analysis</span>
+                                </div>
+                                <p className="text-xs font-medium text-zinc-400 leading-relaxed uppercase tracking-tight bg-zinc-950/30 p-4 rounded-xl border border-white/5">{news.desc}</p>
+                                <div className="p-4 bg-emerald-500/5 rounded-xl border border-emerald-500/10">
+                                   <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest block mb-1">Institutional Consensus</span>
+                                   <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-tight italic">"{news.keyPoint}"</p>
+                                </div>
+                              </div>
+
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-zinc-950/50 rounded-2xl border border-white/5">
+                                <div className="space-y-1">
+                                  <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest">Duration</span>
+                                  <div className="flex items-center gap-2">
+                                     <Clock className="w-3 h-3 text-zinc-500" />
+                                     <span className="text-[10px] font-black text-zinc-300 uppercase">{news.duration}</span>
+                                  </div>
+                                </div>
+                                <div className="space-y-1">
+                                  <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest">Release Status</span>
+                                  <div className="flex items-center gap-2">
+                                     <div className={cn(
+                                       "w-1.5 h-1.5 rounded-full",
+                                       news.status === 'In Focus' ? "bg-emerald-500 animate-pulse" : 
+                                       news.status === 'Released' ? "bg-white/40" : "bg-zinc-700"
+                                     )} />
+                                     <span className={cn(
+                                       "text-[9px] font-black uppercase tracking-tighter",
+                                       news.status === 'In Focus' ? "text-emerald-500" : 
+                                       news.status === 'Released' ? "text-zinc-500" : "text-zinc-500"
+                                     )}>{news.status}</span>
+                                  </div>
+                                </div>
+                                <div className="space-y-1">
+                                  <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest">Forecast</span>
+                                  <span className="text-[10px] font-black text-white block">{news.forecast}</span>
+                                </div>
+                                <div className="space-y-1">
+                                  <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest">Previous</span>
+                                  <span className="text-[10px] font-black text-white block">{news.previous}</span>
+                                </div>
+                              </div>
+
+                              <div className="flex flex-col md:flex-row gap-3">
+                                <div className="flex-1 p-4 bg-emerald-500/5 rounded-2xl border border-emerald-500/10 group/p">
+                                  <div className="flex items-center justify-between mb-2">
+                                     <span className="text-[8px] font-black text-emerald-500 uppercase tracking-widest">Above Forecast</span>
+                                     <TrendingUp className="w-3 h-3 text-emerald-500 group-hover/p:rotate-12 transition-transform" />
+                                  </div>
+                                  <p className="text-[10px] font-black text-white uppercase tracking-tight">{news.impact === 'high' ? 'Very Bullish' : 'Bullish'}</p>
+                                  <span className="text-[8px] font-bold text-emerald-500/60 uppercase tracking-widest leading-none">Expansion Target</span>
+                                </div>
+                                
+                                <div className="flex-1 p-4 bg-zinc-900/50 rounded-2xl border border-white/5 group/p">
+                                  <div className="flex items-center justify-between mb-2">
+                                     <span className="text-[8px] font-black text-zinc-500 uppercase tracking-widest">On Forecast</span>
+                                     <RotateCw className="w-3 h-3 text-zinc-500 group-hover/p:rotate-180 transition-transform duration-700" />
+                                  </div>
+                                  <p className="text-[10px] font-black text-white uppercase tracking-tight">Ranging</p>
+                                  <span className="text-[8px] font-bold text-zinc-600 uppercase tracking-widest leading-none">Equilibrium</span>
+                                </div>
+
+                                <div className="flex-1 p-4 bg-rose-500/5 rounded-2xl border border-rose-500/10 group/p">
+                                  <div className="flex items-center justify-between mb-2">
+                                     <span className="text-[8px] font-black text-rose-500 uppercase tracking-widest">Below Forecast</span>
+                                     <TrendingDown className="w-3 h-3 text-rose-500 group-hover/p:-rotate-12 transition-transform" />
+                                  </div>
+                                  <p className="text-[10px] font-black text-white uppercase tracking-tight">{news.impact === 'high' ? 'Very Bearish' : 'Bearish'}</p>
+                                  <span className="text-[8px] font-bold text-rose-500/60 uppercase tracking-widest leading-none">Structural Break</span>
+                                </div>
+                              </div>
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  </motion.div>
+                ))}
+              </motion.div>
+            </AnimatePresence>
+            
+            <div className="mt-8 pt-8 border-t border-zinc-800">
+              <AINewsAnalysis news={currentNews} includeFutures={true} />
+            </div>
+          </div>
+        </div>
+
+        {/* Prediction Column */}
+        <div className="w-full lg:w-[450px] flex flex-col gap-6">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-[2.5rem] p-8 relative overflow-hidden group hover:border-indigo-500/20 transition-all shadow-2xl">
+            <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:scale-110 transition-transform duration-700">
+              <TargetIcon className="w-48 h-48 text-white" />
+            </div>
+            
+            <div className="flex items-center gap-3 mb-8 relative z-10">
+              <div className="w-10 h-10 rounded-2xl bg-indigo-500/10 flex items-center justify-center border border-indigo-500/20">
+                <TargetIcon className="w-5 h-5 text-indigo-500" />
+              </div>
+              <div>
+                <h4 className="text-sm font-black text-white uppercase tracking-[0.2em]">MARKET PREDICTION</h4>
+                <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Macro Bias / Futures</p>
+              </div>
+            </div>
+            
+            <div className="space-y-6 relative z-10">
+              <div className="flex items-center justify-between bg-zinc-950 p-4 rounded-2xl border border-zinc-800">
+                <select 
+                  value={selectedAsset} 
+                  onChange={(e) => setSelectedAsset(e.target.value)}
+                  className="bg-transparent text-sm font-black text-white uppercase outline-none cursor-pointer hover:text-emerald-400 transition-colors"
+                >
+                  <optgroup label="Futures">
+                    <option value="ES1!">E-mini S&P 500 (ES)</option>
+                    <option value="NQ1!">E-mini Nasdaq (NQ)</option>
+                    <option value="MES1!">Micro S&P 500 (MES)</option>
+                    <option value="MNQ1!">Micro Nasdaq (MNQ)</option>
+                  </optgroup>
+                  <optgroup label="Forex/Metals">
+                    <option value="EURUSD">EUR/USD</option>
+                    <option value="GBPUSD">GBP/USD</option>
+                    <option value="XAUUSD">GOLD (GC)</option>
+                  </optgroup>
+                </select>
+                <div className="flex items-center gap-2 px-3 py-1 bg-emerald-500/10 rounded-full border border-emerald-500/20">
+                   <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                   <span className="text-[9px] font-black text-emerald-400 uppercase tracking-widest tracking-tighter">Liquid Zone</span>
+                </div>
+              </div>
+
+              <div className="p-6 bg-zinc-950 border border-zinc-800 rounded-3xl group/card relative overflow-hidden">
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="w-10 h-10 rounded-full border-2 border-zinc-900 overflow-hidden shadow-xl">
+                    <img src={getCurrencyLogo(selectedAsset.includes('USD') ? selectedAsset.substring(0, 3) : 'USD')} className="w-full h-full object-cover" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block mb-0.5">Asset Impact</span>
+                    <h5 className="text-white font-black uppercase text-xl tracking-tighter">{selectedAsset} Manipulation</h5>
+                  </div>
+                </div>
+                
+                <p className="text-xs font-medium text-zinc-500 leading-relaxed group-hover:text-zinc-300 transition-colors">
+                  The current institutional bias on {selectedAsset} is leaning toward a <span className="text-rose-500 font-bold underline decoration-rose-500/30">Stop Hunt</span> manipulation below the Asian session lows. Major news event at 08:30 expects a liquidity sweep into the FVG (Fair Value Gap) before a structural expansion higher.
+                </p>
+                
+                <div className="mt-6 flex flex-wrap gap-2">
+                  <div className="px-3 py-1.5 bg-rose-500/10 text-rose-400 rounded-xl text-[9px] font-black uppercase tracking-widest border border-rose-500/20">Sell-Side Liquidity</div>
+                  <div className="px-3 py-1.5 bg-emerald-500/10 text-emerald-400 rounded-xl text-[9px] font-black uppercase tracking-widest border border-emerald-500/20">Order Block Re-entry</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+};
+
+const MarketBannerSlider = () => {
+  const [currentSlide, setCurrentSlide] = useState(0);
+  
+  const slides = [
+    {
+      title: "SMART WATCHLISTS",
+      description: "Star your favorite assets to build a custom dashboard. Get AI-powered insights, real-time sentiment, and technical bias analysis.",
+      accent: "from-indigo-600 to-emerald-600",
+      icon: <Star className="w-64 h-64 text-white" />,
+      badge: "New Feature",
+      extra: (
+        <div className="flex items-center gap-4">
+          <div className="flex -space-x-3">
+            {[1, 2, 3, 4].map(i => (
+              <div key={i} className="w-10 h-10 rounded-full border-2 border-indigo-600 bg-zinc-900 flex items-center justify-center text-[10px] font-black text-white uppercase overflow-hidden">
+                <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=trader${i}`} alt="User" referrerPolicy="no-referrer" />
+              </div>
+            ))}
+          </div>
+          <p className="text-[10px] font-black text-white/60 uppercase tracking-widest">JOIN 2,400+ TRADERS</p>
+        </div>
+      )
+    },
+    {
+      title: "REAL USER ACTIVITY",
+      description: "Our community of pro traders is growing daily. See what assets are currently trending in the global watchlist collections.",
+      accent: "from-rose-600 to-orange-600",
+      icon: <Users className="w-64 h-64 text-white" />,
+      badge: "Community",
+      extra: (
+        <div className="flex flex-wrap gap-3">
+          {['Alex G.', 'Sarah M.', 'Ken K.', 'Elena R.'].map(user => (
+            <div key={user} className="px-3 py-1 bg-white/10 rounded-lg flex items-center gap-2 border border-white/10">
+              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-[10px] font-bold text-white">{user} starred BTCUSD</span>
+            </div>
+          ))}
+        </div>
+      )
+    },
+    {
+      title: "AI INTELLIGENCE",
+      description: "Proprietary market sentiment analysis using the latest Gemini models. Context-aware bias detection for your specific watchlist.",
+      accent: "from-emerald-600 to-teal-400",
+      icon: <Sparkles className="w-64 h-64 text-white" />,
+      badge: "AI Powered",
+      extra: (
+        <div className="flex items-center gap-2 px-4 py-2 bg-black/30 rounded-2xl border border-white/10">
+          <Globe className="w-4 h-4 text-emerald-400" />
+          <span className="text-[10px] font-black text-white uppercase tracking-widest">Global Coverage 24/7</span>
+        </div>
+      )
+    }
+  ];
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentSlide(prev => (prev + 1) % slides.length);
+    }, 6000);
+    return () => clearInterval(timer);
+  }, []);
+
+  return (
+    <div className="mt-12 mb-12 relative h-[380px]">
+      <AnimatePresence mode="wait">
+        <motion.div 
+          key={currentSlide}
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: -20 }}
+          transition={{ duration: 0.6, ease: "circOut" }}
+          className={cn(
+            "absolute inset-0 overflow-hidden rounded-[2.5rem] bg-gradient-to-br p-10 group flex flex-col justify-center",
+            slides[currentSlide].accent
+          )}
+        >
+          <div className="absolute inset-0 bg-black/20 backdrop-blur-[2px]" />
+          <div className="absolute top-0 right-0 p-10 opacity-20 transform translate-x-1/4 -translate-y-1/4 group-hover:scale-110 transition-transform duration-700">
+            {slides[currentSlide].icon}
+          </div>
+          
+          <div className="relative z-10 max-w-2xl">
+            <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 backdrop-blur-md rounded-full border border-white/20 mb-6">
+              <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+              <span className="text-[10px] font-black text-white uppercase tracking-widest">{slides[currentSlide].badge}</span>
+            </div>
+            <h2 className="text-4xl font-black text-white tracking-tighter mb-4 leading-[0.9] uppercase">
+              {slides[currentSlide].title}
+            </h2>
+            <p className="text-white/80 text-sm font-medium leading-relaxed mb-8 max-w-xl">
+              {slides[currentSlide].description}
+            </p>
+            {slides[currentSlide].extra}
+          </div>
+
+          <div className="absolute bottom-10 right-10 flex gap-2 z-20">
+            {slides.map((_, idx) => (
+              <button
+                key={idx}
+                onClick={() => setCurrentSlide(idx)}
+                className={cn(
+                  "h-1 rounded-full transition-all duration-300",
+                  currentSlide === idx ? "w-8 bg-white" : "w-2 bg-white/30"
+                )}
+              />
+            ))}
+          </div>
+        </motion.div>
+      </AnimatePresence>
+    </div>
+  );
+};
+
+const AIInsights = ({ starredSymbol }: { starredSymbol: string | null }) => {
+  const [analysis, setAnalysis] = useState<{
+    sentiment: 'bullish' | 'bearish' | 'neutral',
+    confidence: number,
+    reasoning: string,
+    probabilities: { bullish: number, neutral: number, bearish: number }
+  } | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const getInsights = async () => {
+    if (!starredSymbol) return;
+    setLoading(true);
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const prompt = `Act as a senior market analyst. Analyze the following asset: ${starredSymbol}. 
+      Provide:
+      1. Sentiment (bullish/bearish/neutral)
+      2. Confidence score (0-100)
+      3. Reasoning (2-3 sentences)
+      4. Prediction market probabilities (bullish, neutral, bearish summing to 100)
+      
+      Respond ONLY in JSON: {
+        "sentiment": "bullish" | "bearish" | "neutral",
+        "confidence": number,
+        "reasoning": "string",
+        "probabilities": { "bullish": number, "neutral": number, "bearish": number }
+      }`;
+      
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: [{ parts: [{ text: prompt }] }],
+      });
+      const text = response.text || "";
+      const cleanedText = text.replace(/```json|```/g, '').trim();
+      setAnalysis(JSON.parse(cleanedText));
+    } catch (err) {
+      console.error(err);
+      setAnalysis(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="mt-12 p-10 bg-zinc-950 rounded-[3rem] border border-zinc-900 border-dashed relative overflow-hidden group">
+      <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity">
+        <Sparkles className="w-32 h-32 text-emerald-500" />
+      </div>
+      
+      <div className="relative z-10">
+        <div className="flex items-center gap-4 mb-8">
+          <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 flex items-center justify-center">
+            <Sparkles className="w-6 h-6 text-indigo-500" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-black text-white uppercase tracking-tight">AI Intelligence Focus</h2>
+            <p className="text-xs text-zinc-500 font-bold uppercase tracking-widest opacity-60">Deep analysis for {starredSymbol || 'focused asset'}</p>
+          </div>
+        </div>
+
+        {!starredSymbol ? (
+          <div className="py-12 text-center border-2 border-zinc-900 border-dashed rounded-[2rem] bg-zinc-900/10 backdrop-blur-sm">
+            <p className="text-zinc-500 text-sm italic">Star an asset to receive targeted AI insights.</p>
+          </div>
+        ) : (
+          <div className="space-y-8">
+            {!analysis && !loading && (
+              <button 
+                onClick={getInsights}
+                className="w-full py-6 bg-zinc-900 hover:bg-zinc-800 text-white rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest border border-zinc-800 transition-all flex items-center justify-center gap-3 shadow-2xl shadow-emerald-500/5 shadow-indigo-500/10"
+              >
+                <Sparkles className="w-5 h-5 text-emerald-500" />
+                Analyze {starredSymbol} Bias
+              </button>
+            )}
+
+            {loading && (
+              <div className="flex flex-col items-center justify-center py-12 gap-4">
+                <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest animate-pulse">Computing Market Structure...</p>
+              </div>
+            )}
+
+            {analysis && (
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="space-y-8"
+              >
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                   <div className="col-span-2 space-y-6">
+                      <div className="bg-zinc-900/40 p-8 rounded-3xl border border-zinc-900">
+                         <div className="flex items-center gap-2 mb-4">
+                            <span className={cn(
+                               "text-[10px] font-black uppercase px-2 py-0.5 rounded",
+                               analysis.sentiment === 'bullish' ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" : analysis.sentiment === 'bearish' ? "bg-rose-500/10 text-rose-400 border border-rose-500/20" : "bg-zinc-800 text-zinc-400 border border-zinc-700"
+                            )}>{analysis.sentiment}</span>
+                            <div className="h-px flex-1 bg-zinc-800" />
+                            <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">{analysis.confidence}% Confidence</span>
+                         </div>
+                         <p className="text-sm text-zinc-300 leading-relaxed font-medium italic">
+                            "{analysis.reasoning}"
+                         </p>
+                      </div>
+                   </div>
+
+                   <div className="col-span-1 bg-black/40 p-8 rounded-3xl border border-zinc-900 flex flex-col justify-center">
+                      <h4 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-6">Prediction Market</h4>
+                      <div className="space-y-4">
+                         {Object.entries(analysis.probabilities).map(([key, val]) => (
+                            <div key={key} className="space-y-1.5">
+                               <div className="flex items-center justify-between text-[8px] font-black uppercase tracking-widest text-zinc-500">
+                                  <span>{key}</span>
+                                  <span>{val}%</span>
+                               </div>
+                               <div className="h-1.5 bg-zinc-900 rounded-full overflow-hidden">
+                                  <motion.div 
+                                     initial={{ width: 0 }}
+                                     animate={{ width: `${val}%` }}
+                                     className={cn(
+                                        "h-full rounded-full",
+                                        key === 'bullish' ? "bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]" : key === 'bearish' ? "bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.3)]" : "bg-zinc-500"
+                                     )}
+                                  />
+                               </div>
+                            </div>
+                         ))}
+                      </div>
+                   </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-6 border-t border-zinc-900">
+                  <p className="text-[9px] text-zinc-600 font-black uppercase tracking-widest">Source: Gemini 3 High-Fidelity Focus</p>
+                  <button 
+                    onClick={() => setAnalysis(null)}
+                    className="text-[10px] text-zinc-500 hover:text-white uppercase font-black tracking-widest transition-colors flex items-center gap-1.5 group"
+                  >
+                    <RotateCw className="w-3 h-3 group-hover:rotate-180 transition-transform duration-500" />
+                    Re-Analyze Focus
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const EconomicCalendar = () => {
+  const [activeWeekOffset, setActiveWeekOffset] = useState(0); // 0 = Current, 1 = Next
+  const [activeDate, setActiveDate] = useState(() => format(new Date(), 'yyyy-MM-dd'));
+  const [timezone, setTimezone] = useState<'EST' | 'PHT'>('EST');
+  
+  const economicEvents = useMemo(() => {
+    // Shared events from BankForecast or similar
+    const allEvents = [
+      // Current Week (May 4 - May 10, 2026)
+      { date: '2026-05-04', time: '09:30', currency: 'AUD', impact: 'medium', event: 'ANZ Job Advertisements', actual: '1.2%', forecast: '0.8%', previous: '-1.5%', desc: 'Measure of the change in the number of jobs advertised.' },
+      { date: '2026-05-05', time: '04:30', currency: 'GBP', impact: 'medium', event: 'Final Services PMI', actual: '53.4', forecast: '53.1', previous: '53.1', desc: 'Economic health of the services sector.' },
+      { date: '2026-05-05', time: '10:00', currency: 'USD', impact: 'high', event: 'ISM Services PMI', actual: '52.8', forecast: '52.0', previous: '51.4', desc: 'Survey of purchasing managers in the services industry.' },
+      { date: '2026-05-06', time: '08:15', currency: 'USD', impact: 'high', event: 'ADP Non-Farm Employment Change', actual: '188K', forecast: '175K', previous: '184K', desc: 'Estimate of the change in the number of employed people.' },
+      { date: '2026-05-06', time: '10:30', currency: 'USD', impact: 'medium', event: 'Crude Oil Inventories', actual: '-1.4M', forecast: '-1.1M', previous: '7.3M', desc: 'Change in the number of barrels of crude oil held in inventory.' },
+      { date: '2026-05-07', time: '07:00', currency: 'GBP', impact: 'high', event: 'Official Bank Rate', actual: '5.25%', forecast: '5.25%', previous: '5.25%', desc: 'Interest rate at which the BoE lends to financial institutions.' },
+      { date: '2026-05-07', time: '08:30', currency: 'USD', impact: 'high', event: 'Unemployment Claims', actual: '212K', forecast: '215K', previous: '208K', desc: 'Number of individuals who filed for unemployment insurance.' },
+      { date: '2026-05-08', time: '08:30', currency: 'USD', impact: 'high', event: 'Non-Farm Employment Change', actual: '-', forecast: '243K', previous: '303K', desc: 'Change in the number of employed people during the previous month.' },
+      { date: '2026-05-08', time: '08:30', currency: 'USD', impact: 'high', event: 'Unemployment Rate', actual: '-', forecast: '3.8%', previous: '3.8%', desc: 'Percentage of the total work force that is unemployed.' },
+      { date: '2026-05-09', time: '09:00', currency: 'CAD', impact: 'low', event: 'BOC Gov Macklem Speaks', actual: '-', forecast: '-', previous: '-', desc: 'Speech by the Governor of the Bank of Canada.' },
+
+      // Next Week (May 11 - May 17, 2026)
+      { date: '2026-05-11', time: '08:30', currency: 'USD', impact: 'low', event: 'NY Empire State Manufacturing Index', actual: '-', forecast: '-5.2', previous: '-14.3', desc: 'Manufacturing conditions in New York State.' },
+      { date: '2026-05-12', time: '08:30', currency: 'USD', impact: 'high', event: 'PPI m/m', actual: '-', forecast: '0.3%', previous: '0.2%', desc: 'Change in the price of finished goods and services sold by producers.' },
+      { date: '2026-05-13', time: '08:30', currency: 'USD', impact: 'high', event: 'CPI m/m', actual: '-', forecast: '0.4%', previous: '0.4%', desc: 'Change in the price of goods and services purchased by consumers.' },
+      { date: '2026-05-13', time: '08:30', currency: 'USD', impact: 'high', event: 'CPI y/y', actual: '-', forecast: '3.4%', previous: '3.5%', desc: 'Year-over-year change in consumer prices.' },
+      { date: '2026-05-14', time: '08:30', currency: 'USD', impact: 'high', event: 'Retail Sales m/m', actual: '-', forecast: '0.4%', previous: '0.7%', desc: 'Change in the total value of sales at the retail level.' },
+      { date: '2026-05-14', time: '08:30', currency: 'USD', impact: 'high', event: 'Core Retail Sales m/m', actual: '-', forecast: '0.2%', previous: '1.1%', desc: 'Change in the value of sales at the retail level, excluding autos.' },
+      { date: '2026-05-15', time: '10:00', currency: 'USD', impact: 'medium', event: 'UoM Consumer Sentiment', actual: '-', forecast: '76.2', previous: '77.9', desc: 'Survey of consumer confidence levels in the US.' },
+    ];
+    return allEvents;
+  }, []);
+
+  const convertTime = (timeEST: string, targetTz: 'EST' | 'PHT') => {
+    if (targetTz === 'EST') return timeEST;
+    const [hours, minutes] = timeEST.split(':').map(Number);
+    let phtHours = (hours + 12) % 24;
+    const phtPeriod = phtHours >= 12 ? 'PM' : 'AM';
+    const displayHours = phtHours % 12 || 12;
+    return `${displayHours}:${minutes.toString().padStart(2, '0')} ${phtPeriod}`;
+  };
+
+  const currentWeekStart = startOfWeek(addWeeks(new Date(), activeWeekOffset), { weekStartsOn: 1 });
+  const currentWeekEnd = endOfWeek(currentWeekStart, { weekStartsOn: 1 });
+  
+  const dates = useMemo(() => {
+    return Array.from({ length: 7 }, (_, i) => format(addDays(currentWeekStart, i), 'yyyy-MM-dd'));
+  }, [currentWeekStart]);
+
+  useEffect(() => {
+    // When week changes, select the first day of that week
+    setActiveDate(dates[0]);
+  }, [dates]);
+
+  return (
+    <div className="max-w-7xl mx-auto p-4 md:p-8 pb-32">
+       <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-12 md:mb-16">
+          <div className="flex items-center gap-4 md:gap-6">
+             <div className="w-12 h-12 md:w-16 md:h-16 rounded-2xl md:rounded-3xl bg-indigo-500/10 flex items-center justify-center border border-indigo-500/20 shadow-2xl shadow-indigo-500/10">
+                <Calendar className="w-6 h-6 md:w-8 md:h-8 text-indigo-500" />
+             </div>
+             <div>
+                <h2 className="text-3xl md:text-6xl font-black text-white uppercase tracking-tighter leading-none mb-1 md:mb-2 text-shadow-glow">ECONOMIC CALENDAR</h2>
+                <div className="flex items-center gap-3">
+                   <p className="text-[10px] text-zinc-500 font-black uppercase tracking-[0.4em]">Institutional Data Stream</p>
+                   <div className="h-1 w-1 rounded-full bg-zinc-800" />
+                   <p className="text-[10px] text-indigo-400 font-black uppercase tracking-[0.2em]">{format(currentWeekStart, 'MMM dd')} — {format(currentWeekEnd, 'MMM dd')}</p>
+                </div>
+             </div>
+          </div>
+          
+          <div className="flex flex-col sm:flex-row gap-4 items-center">
+            <div className="flex bg-zinc-950 p-1.5 rounded-2xl border border-zinc-900 shadow-2xl w-full sm:w-auto">
+               <button 
+                  onClick={() => setTimezone('EST')}
+                  className={cn(
+                     "flex-1 sm:px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all",
+                     timezone === 'EST' ? "bg-indigo-500 text-white shadow-xl" : "text-zinc-500 hover:text-white"
+                  )}
+               >
+                  EST
+               </button>
+               <button 
+                  onClick={() => setTimezone('PHT')}
+                  className={cn(
+                     "flex-1 sm:px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all",
+                     timezone === 'PHT' ? "bg-indigo-500 text-white shadow-xl" : "text-zinc-500 hover:text-white"
+                  )}
+               >
+                  PHT
+               </button>
+            </div>
+            
+            <div className="flex bg-zinc-950 p-1.5 rounded-2xl border border-zinc-900 shadow-2xl w-full sm:w-auto">
+               <button 
+                  onClick={() => setActiveWeekOffset(0)}
+                  className={cn(
+                     "flex-1 sm:px-6 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all",
+                     activeWeekOffset === 0 ? "bg-white text-black shadow-xl" : "text-zinc-500 hover:text-white"
+                  )}
+               >
+                  This Week
+               </button>
+               <button 
+                  onClick={() => setActiveWeekOffset(1)}
+                  className={cn(
+                     "flex-1 sm:px-6 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all",
+                     activeWeekOffset === 1 ? "bg-white text-black shadow-xl" : "text-zinc-500 hover:text-white"
+                  )}
+               >
+                  Next Week
+               </button>
+            </div>
+          </div>
+       </div>
+
+       <div className="flex overflow-x-auto gap-3 md:gap-4 mb-10 md:mb-12 no-scrollbar pb-4 -mx-4 px-4 md:mx-0 md:px-0 scroll-smooth">
+          {dates.map(date => (
+             <button
+                key={date}
+                onClick={() => setActiveDate(date)}
+                className={cn(
+                   "px-6 py-4 md:px-10 md:py-6 rounded-[1.5rem] md:rounded-[2.5rem] border transition-all flex flex-col items-center gap-1 md:gap-2 group shrink-0",
+                   activeDate === date 
+                   ? "bg-white text-black border-white shadow-2xl scale-105" 
+                   : "bg-zinc-950 border-zinc-800 text-zinc-500 hover:border-white/20 hover:text-white"
+                )}
+             >
+                <span className="text-[8px] md:text-[10px] font-black uppercase tracking-widest opacity-60">
+                   {format(parseISO(date), 'EEE')}
+                </span>
+                <span className="text-lg md:text-3xl font-black">{format(parseISO(date), 'dd')}</span>
+                <span className="text-[8px] md:text-[10px] font-black uppercase tracking-tighter italic opacity-60">
+                   {format(parseISO(date), 'MMM')}
+                </span>
+             </button>
+          ))}
+       </div>
+
+       <div className="grid grid-cols-12 gap-8 px-10 py-6 bg-zinc-950 border border-zinc-900 rounded-[2rem] mb-6 hidden md:grid">
+          <div className="col-span-1 text-[10px] font-black text-zinc-600 uppercase tracking-widest">Time</div>
+          <div className="col-span-1 text-[10px] font-black text-zinc-600 uppercase tracking-widest">Currency</div>
+          <div className="col-span-1 text-[10px] font-black text-zinc-600 uppercase tracking-widest">Impact</div>
+          <div className="col-span-3 text-[10px] font-black text-zinc-600 uppercase tracking-widest">Event</div>
+          <div className="col-span-2 text-[10px] font-black text-zinc-600 uppercase tracking-widest text-right">Actual</div>
+          <div className="col-span-2 text-[10px] font-black text-zinc-600 uppercase tracking-widest text-right">Forecast</div>
+          <div className="col-span-2 text-[10px] font-black text-zinc-600 uppercase tracking-widest text-right">Previous</div>
+       </div>
+
+       <div className="space-y-12">
+          {dates.map(date => {
+             const dayEvents = economicEvents.filter(e => e.date === date);
+             if (dayEvents.length === 0) return null;
+             
+             return (
+                <div key={date} id={`date-${date}`} className="space-y-4">
+                   <div className="flex items-center gap-4 px-4">
+                      <div className="h-px flex-1 bg-white/5" />
+                      <h2 className={cn(
+                        "text-[10px] font-black uppercase tracking-[0.4em] transition-all",
+                        activeDate === date ? "text-white" : "text-zinc-700"
+                      )}>
+                        {format(parseISO(date), 'EEEE, MMMM dd')}
+                      </h2>
+                      <div className="h-px flex-1 bg-white/5" />
+                   </div>
+                   
+                   <div className="space-y-4">
+                      {dayEvents.map((e, idx) => (
+                         <motion.div
+                            key={`${e.event}-${idx}`}
+                            initial={{ opacity: 0, y: 10 }}
+                            whileInView={{ opacity: 1, y: 0 }}
+                            viewport={{ once: true }}
+                            className={cn(
+                              "group grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-8 items-center px-6 md:px-10 py-6 md:py-8 bg-zinc-950/40 border transition-all hover:bg-zinc-900/20 rounded-[2rem] md:rounded-[2.5rem]",
+                              activeDate === date ? "border-indigo-500/30" : "border-zinc-800/50 hover:border-zinc-700"
+                            )}
+                         >
+                            <div className="col-span-1 flex items-center justify-between md:block">
+                               <div className="text-base md:text-lg font-black text-white">{convertTime(e.time, timezone)}</div>
+                               <div className="md:hidden flex items-center gap-2">
+                                 <span className={cn(
+                                   "text-[8px] font-black uppercase px-2 py-0.5 rounded-full",
+                                   e.impact === 'high' ? "bg-rose-500/20 text-rose-500" : e.impact === 'medium' ? "bg-orange-500/20 text-orange-500" : "bg-emerald-500/20 text-emerald-500"
+                                 )}>{e.impact}</span>
+                                 <span className="text-[10px] font-black text-zinc-500">{e.currency}</span>
+                               </div>
+                            </div>
+                            <div className="col-span-1 hidden md:flex items-center gap-3">
+                               <div className="w-8 h-8 rounded-full overflow-hidden border border-white/10 shadow-lg">
+                                  <img src={`https://raw.githubusercontent.com/manon-m/Forex-Icons/master/flags/${e.currency.toLowerCase()}.png`} alt={e.currency} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                               </div>
+                               <span className="text-xs font-black text-zinc-400">{e.currency}</span>
+                            </div>
+                            <div className="col-span-1 hidden md:block">
+                               <div className={cn(
+                                  "w-6 h-3 rounded-full shadow-lg",
+                                  e.impact === 'high' ? "bg-rose-500 shadow-rose-500/20" : e.impact === 'medium' ? "bg-orange-500 shadow-orange-500/20" : "bg-emerald-500 shadow-emerald-500/20"
+                               )} title={`${e.impact} Impact`} />
+                            </div>
+                            <div className="col-span-12 md:col-span-3">
+                               <div className="flex flex-col gap-1">
+                                  <h4 className="text-sm md:text-base font-black text-white group-hover:text-indigo-400 transition-colors uppercase tracking-tight">{e.event}</h4>
+                                  <p className="hidden md:block text-[10px] font-medium text-zinc-500 uppercase tracking-tight opacity-60 leading-relaxed max-w-sm">{e.desc}</p>
+                               </div>
+                            </div>
+                            
+                            <div className="col-span-12 md:col-span-2 flex justify-between md:justify-end items-baseline md:text-right border-t border-white/5 pt-4 md:border-0 md:pt-0">
+                               <div className="md:hidden text-[8px] font-black text-zinc-500 uppercase tracking-widest">Actual</div>
+                               <div className={cn(
+                                 "text-sm font-black uppercase",
+                                 e.actual !== '-' && e.forecast !== '-' && e.actual > e.forecast ? "text-emerald-500" : e.actual !== '-' && e.forecast !== '-' && e.actual < e.forecast ? "text-rose-500" : "text-white"
+                               )}>{e.actual}</div>
+                            </div>
+                            <div className="col-span-12 md:col-span-2 flex justify-between md:justify-end items-baseline md:text-right">
+                               <div className="md:hidden text-[8px] font-black text-zinc-500 uppercase tracking-widest">Forecast</div>
+                               <div className="text-sm font-black text-white opacity-60 uppercase">{e.forecast}</div>
+                            </div>
+                            <div className="col-span-12 md:col-span-2 flex justify-between md:justify-end items-baseline md:text-right">
+                               <div className="md:hidden text-[8px] font-black text-zinc-500 uppercase tracking-widest">Previous</div>
+                               <div className="text-sm font-black text-zinc-500 uppercase">{e.previous}</div>
+                            </div>
+                         </motion.div>
+                      ))}
+                   </div>
+                </div>
+             );
+          })}
+       </div>
+       
+       <div className="mt-12 md:mt-20 p-8 md:p-10 bg-indigo-500/5 border border-indigo-500/10 rounded-[2rem] md:rounded-[3rem] relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none group-hover:scale-110 transition-transform duration-1000">
+             <Info className="w-32 h-32 md:w-64 md:h-64 text-indigo-500" />
+          </div>
+          <div className="relative z-10">
+             <div className="flex items-center gap-3 mb-6">
+                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest text-shadow-glow">Live Latency: 4ms</span>
+             </div>
+             <h3 className="text-2xl md:text-4xl font-black text-white uppercase tracking-tighter mb-4">ALGO LIQUIDITY PULSE</h3>
+             <p className="text-zinc-500 text-xs md:text-sm font-medium uppercase tracking-tight leading-relaxed max-w-3xl">
+                ZYNC Institutional feeds leverage low-latency connectivity to CME, CBOT, and major central bank disclosure portals. 
+                Data refreshes in real-time. Forecasts are aggregated from Tier-1 bulge bracket banks and leading quantitative research firms.
+             </p>
+          </div>
+       </div>
+    </div>
+  );
+};
+
+const Markets = () => {
+  const assets = useMemo(() => [
+    { symbol: 'AAPL', name: 'Apple Inc.', sector: 'Stocks', price: '185.92', change: '+1.25%', trend: 'up' },
+    { symbol: 'TSLA', name: 'Tesla, Inc.', sector: 'Stocks', price: '175.43', change: '-2.10%', trend: 'down' },
+    { symbol: 'MSFT', name: 'Microsoft Corp.', sector: 'Stocks', price: '415.50', change: '+0.85%', trend: 'up' },
+    { symbol: 'NVDA', name: 'NVIDIA Corp.', sector: 'Stocks', price: '875.28', change: '+3.45%', trend: 'up' },
+    { symbol: 'BTCUSD', name: 'Bitcoin / US Dollar', sector: 'Crypto', price: '68,432', change: '+1.15%', trend: 'up' },
+    { symbol: 'ETHUSD', name: 'Ethereum / US Dollar', sector: 'Crypto', price: '3,842', change: '+2.45%', trend: 'up' },
+    { symbol: 'EURUSD', name: 'EUR / USD', sector: 'Forex', price: '1.0845', change: '-0.12%', trend: 'down' },
+    { symbol: 'GBPUSD', name: 'GBP / USD', sector: 'Forex', price: '1.2734', change: '+0.15%', trend: 'up' },
+    { symbol: 'GLD', name: 'SPDR Gold Trust', sector: 'Commodities', price: '215.34', change: '+0.45%', trend: 'up' },
+    { symbol: 'SPY', name: 'S&P 500 ETF', sector: 'Indices', price: '512.30', change: '+0.55%', trend: 'up' },
+    { symbol: 'QQQ', name: 'Nasdaq 100 ETF', sector: 'Indices', price: '440.15', change: '+0.75%', trend: 'up' },
+    { symbol: 'AMZN', name: 'Amazon.com, Inc.', sector: 'Stocks', price: '178.22', change: '+1.10%', trend: 'up' },
+    // Futures
+    { symbol: 'CME:ES1!', name: 'E-mini S&P 500', sector: 'Futures', price: '5240.25', change: '+0.45%', trend: 'up' },
+    { symbol: 'CME:NQ1!', name: 'E-mini Nasdaq 100', sector: 'Futures', price: '18420.50', change: '+0.82%', trend: 'up' },
+    { symbol: 'COMEX:GC1!', name: 'Gold Futures', sector: 'Futures', price: '2185.30', change: '+0.15%', trend: 'up' },
+    { symbol: 'NYMEX:CL1!', name: 'Crude Oil Futures', sector: 'Futures', price: '78.45', change: '-1.20%', trend: 'down' },
+    { symbol: 'CBOT:RTY1!', name: 'Russell 2000 Futures', sector: 'Futures', price: '2085.20', change: '+0.12%', trend: 'up' },
+    // Micros
+    { symbol: 'CME_MINI:MES1!', name: 'Micro E-mini S&P 500', sector: 'Futures', price: '5240.25', change: '+0.45%', trend: 'up' },
+    { symbol: 'CME_MINI:MNQ1!', name: 'Micro E-mini Nasdaq 100', sector: 'Futures', price: '18420.50', change: '+0.82%', trend: 'up' },
+    { symbol: 'CBOT_MINI:MYM1!', name: 'Micro E-mini Dow 30', sector: 'Futures', price: '38850', change: '+0.35%', trend: 'up' },
+    { symbol: 'CME_MINI:M2K1!', name: 'Micro E-mini Russell 2000', sector: 'Futures', price: '2085.20', change: '+0.12%', trend: 'up' },
+  ], []);
+
+  const categories = ['All', 'Stocks', 'Crypto', 'Forex', 'Futures', 'Indices', 'Commodities'];
+  const [activeCategory, setActiveCategory] = useState('Futures');
+  const [hoveredSymbol, setHoveredSymbol] = useState<string | null>(null);
+  const [collapsedSectors, setCollapsedSectors] = useState<string[]>([]);
+  const [starredSymbol, setStarredSymbol] = useState<string | null>(() => {
+    return localStorage.getItem('starred_asset');
+  });
+
+  useEffect(() => {
+    if (starredSymbol) {
+      localStorage.setItem('starred_asset', starredSymbol);
+    } else {
+      localStorage.removeItem('starred_asset');
+    }
+  }, [starredSymbol]);
+
+  const toggleSector = (sector: string) => {
+    setCollapsedSectors(prev => 
+      prev.includes(sector) ? prev.filter(s => s !== sector) : [...prev, sector]
+    );
+  };
+
+  const toggleStar = (e: React.MouseEvent, symbol: string) => {
+    e.stopPropagation();
+    setStarredSymbol(prev => prev === symbol ? null : symbol);
+  };
+
+  const filteredAssets = activeCategory === 'All' 
+    ? assets 
+    : assets.filter(a => a.sector === activeCategory);
+
+  const groupedAssets = useMemo(() => {
+    return filteredAssets.reduce((acc, asset) => {
+      if (!acc[asset.sector]) acc[asset.sector] = [];
+      acc[asset.sector].push(asset);
+      return acc;
+    }, {} as Record<string, typeof assets>);
+  }, [filteredAssets]);
+
+  const handleAssetClick = (symbol: string) => {
+    window.open(`https://www.tradingview.com/chart/?symbol=${symbol}`, '_blank');
+  };
+
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="p-8 max-w-7xl mx-auto pb-32"
+    >
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
+        <div>
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 flex items-center justify-center">
+              <Globe className="w-5 h-5 text-emerald-500" />
+            </div>
+            <h1 className="text-4xl font-black tracking-tight text-white">Global Markets</h1>
+          </div>
+          <p className="text-zinc-500 text-sm italic">Live snapshots and quick execution. Click an asset to analyze on TradingView.</p>
+        </div>
+        <div className="flex flex-wrap gap-2 p-1 bg-zinc-950 rounded-2xl border border-zinc-900">
+          {categories.map(cat => (
+            <button
+              key={cat}
+              onClick={() => setActiveCategory(cat)}
+              className={cn(
+                "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
+                activeCategory === cat ? "bg-zinc-800 text-white shadow-lg shadow-black/20" : "text-zinc-600 hover:text-zinc-400"
+              )}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="space-y-12">
+        <BankForecast />
+        {(Object.entries(groupedAssets) as [string, typeof assets][]).map(([sector, sectorAssets]) => (
+          <div key={sector}>
+            <button 
+              onClick={() => toggleSector(sector)}
+              className="flex items-center gap-3 mb-6 group w-full text-left"
+            >
+              <div className="w-6 h-6 rounded-lg bg-zinc-900 flex items-center justify-center transition-transform group-hover:scale-110">
+                <ChevronDown className={cn(
+                  "w-3 h-3 text-zinc-500 transition-transform",
+                  collapsedSectors.includes(sector) && "-rotate-90"
+                )} />
+              </div>
+              <h2 className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em]">{sector}</h2>
+              <div className="h-px flex-1 bg-zinc-900 ml-4 opacity-50" />
+            </button>
+
+            <AnimatePresence initial={false}>
+              {!collapsedSectors.includes(sector) && (
+                <motion.div 
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 overflow-hidden"
+                >
+                  {sectorAssets.map((asset, idx) => (
+                    <motion.div
+                      key={asset.symbol}
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: idx * 0.02 }}
+                      onClick={() => handleAssetClick(asset.symbol)}
+                      onMouseEnter={() => setHoveredSymbol(asset.symbol)}
+                      onMouseLeave={() => setHoveredSymbol(null)}
+                      className="group relative bg-[#09090b] border border-zinc-900 hover:border-emerald-500/30 rounded-3xl p-5 transition-all cursor-pointer hover:shadow-2xl hover:shadow-emerald-500/5 hover:-translate-y-1"
+                    >
+                      {/* Star Icon */}
+                      <button
+                        onClick={(e) => toggleStar(e, asset.symbol)}
+                        className="absolute top-4 right-4 z-20 p-2 rounded-full bg-zinc-900/50 hover:bg-zinc-800 transition-colors opacity-0 group-hover:opacity-100"
+                      >
+                        <Star className={cn(
+                          "w-3.5 h-3.5",
+                          starredSymbol === asset.symbol ? "text-yellow-400 fill-yellow-400" : "text-zinc-600"
+                        )} />
+                      </button>
+
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                          <div className={cn(
+                            "w-10 h-10 rounded-xl flex items-center justify-center font-black text-xs",
+                            asset.trend === 'up' ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20" : "bg-rose-500/10 text-rose-500 border border-rose-500/20"
+                          )}>
+                            {asset.symbol.includes(':') ? asset.symbol.split(':')[1].substring(0, 2) : asset.symbol.substring(0, 2)}
+                          </div>
+                          <div>
+                            <h3 className="text-sm font-black text-white group-hover:text-emerald-400 transition-colors uppercase tracking-tight truncate max-w-[120px]">{asset.symbol.includes(':') ? asset.symbol.split(':')[1] : asset.symbol}</h3>
+                            <p className="text-[10px] text-zinc-600 font-medium truncate max-w-[100px]">{asset.name}</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-sm font-black text-white">${asset.price}</div>
+                          <div className={cn(
+                            "text-[10px] font-bold mt-0.5",
+                            asset.trend === 'up' ? "text-emerald-500" : "text-rose-500"
+                          )}>
+                            {asset.change}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Enlarged Chart Preview on Hover */}
+                      <AnimatePresence>
+                        {hoveredSymbol === asset.symbol && (
+                          <motion.div
+                            initial={{ opacity: 0, scale: 0.9, y: 10 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.9, y: 10 }}
+                            className="absolute inset-0 z-10 bg-zinc-950 rounded-3xl border border-emerald-500/50 overflow-hidden shadow-2xl"
+                          >
+                            <TradingViewWidget symbol={asset.symbol} autosize={true} />
+                            <div className="absolute top-3 left-3 px-2 py-1 bg-black/60 backdrop-blur-md rounded-md border border-white/10 z-20">
+                              <p className="text-[8px] font-black text-white uppercase tracking-widest">{asset.symbol} LIVE</p>
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+
+                      <div className="flex items-center justify-between pt-4 border-t border-zinc-900/50">
+                        <span className="text-[9px] font-black text-zinc-600 uppercase tracking-widest">{asset.sector}</span>
+                        <div className="flex items-center gap-1.5 px-2 py-0.5 bg-zinc-900/50 rounded-full border border-zinc-800/50 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <TrendingUp className="w-2.5 h-2.5 text-emerald-500" />
+                          <span className="text-[8px] font-black text-zinc-400 uppercase tracking-tighter">TV Chart</span>
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        ))}
+      </div>
+
+      <MarketBannerSlider />
+
+      {/* Watchlist Section */}
+      <div className="mb-24">
+        <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-6">
+          <div className="flex items-center gap-5">
+            <div className="w-16 h-16 rounded-[2rem] bg-yellow-500/10 flex items-center justify-center border border-yellow-500/20 shadow-2xl shadow-yellow-500/10">
+              <Star className="w-8 h-8 text-yellow-500 fill-yellow-500" />
+            </div>
+            <div>
+              <h2 className="text-5xl font-black text-white uppercase tracking-tighter leading-[0.8] mb-2">ACTIVE FOCUS</h2>
+              <p className="text-sm text-zinc-600 font-black uppercase tracking-[0.3em] opacity-80">Institutional Market Structure</p>
+            </div>
+          </div>
+          <button 
+            onClick={() => setCollapsedSectors(prev => prev.includes('ACTIVE_FOCUS') ? prev.filter(s => s !== 'ACTIVE_FOCUS') : [...prev, 'ACTIVE_FOCUS'])}
+            className="group flex items-center gap-3 px-6 py-3 bg-zinc-950 border border-zinc-800 rounded-2xl hover:border-emerald-500/30 transition-all font-black text-[10px] text-zinc-500 hover:text-white uppercase tracking-widest"
+          >
+            <div className={cn(
+              "transition-transform",
+              collapsedSectors.includes('ACTIVE_FOCUS') && "rotate-180"
+            )}>
+              <ChevronDown className="w-4 h-4" />
+            </div>
+            {collapsedSectors.includes('ACTIVE_FOCUS') ? 'Restore Focus' : 'Collapse Overview'}
+          </button>
+        </div>
+
+        <AnimatePresence initial={false}>
+          {!collapsedSectors.includes('ACTIVE_FOCUS') && (
+            <motion.div
+              initial={{ opacity: 0, height: 0, scale: 0.95 }}
+              animate={{ opacity: 1, height: "auto", scale: 1 }}
+              exit={{ opacity: 0, height: 0, scale: 0.95 }}
+              className="overflow-hidden"
+            >
+              {!starredSymbol ? (
+                <div className="py-32 text-center border-4 border-zinc-900 border-dashed rounded-[4rem] bg-zinc-950/50 flex flex-col items-center group hover:bg-zinc-900/20 transition-all">
+                  <div className="w-24 h-24 rounded-full bg-zinc-900 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                    <Star className="w-10 h-10 text-zinc-700" />
+                  </div>
+                  <h3 className="text-2xl font-black text-white uppercase tracking-tighter mb-2">Zero Focus Targets</h3>
+                  <p className="text-zinc-600 text-xs font-black uppercase tracking-widest opacity-60">Star a symbol from the global markets to begin analysis</p>
+                </div>
+              ) : (
+                <div className="relative">
+                  {assets.filter(a => a.symbol === starredSymbol).map(asset => (
+                    <motion.div
+                      key={`watchlist-${asset.symbol}`}
+                      className="bg-zinc-950 border-2 border-zinc-900 rounded-[4rem] overflow-hidden group shadow-3xl shadow-indigo-500/10 flex flex-col xl:flex-row h-auto xl:min-h-[800px]"
+                    >
+                      {/* Left Metadata Panel (Horizontal Design) */}
+                      <div className="xl:w-[350px] p-8 flex flex-col justify-between border-b xl:border-b-0 xl:border-r border-white/5 relative overflow-hidden bg-gradient-to-br from-zinc-950 to-zinc-900/30">
+                        <div className="absolute top-0 left-0 p-8 opacity-[0.02] pointer-events-none -translate-x-1/2 -translate-y-1/2">
+                          <TargetIcon className="w-80 h-80 text-white" />
+                        </div>
+                        
+                        <div className="relative z-10 space-y-8">
+                          <div className={cn(
+                            "w-20 h-20 rounded-[2rem] flex items-center justify-center font-black text-3xl shadow-2xl transition-all group-hover:scale-105",
+                            asset.trend === 'up' ? "bg-emerald-500/10 text-emerald-500 border-2 border-emerald-500/20 shadow-emerald-500/20" : "bg-rose-500/10 text-rose-500 border-2 border-rose-500/20 shadow-rose-500/20"
+                          )}>
+                            {asset.symbol.includes(':') ? asset.symbol.split(':')[1].substring(0, 2) : asset.symbol.substring(0, 2)}
+                          </div>
+
+                          <div>
+                            <div className="flex items-center gap-3 mb-4">
+                              <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.4em] bg-indigo-500/10 px-4 py-1.5 rounded-full border border-indigo-500/20">{asset.sector}</span>
+                              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                            </div>
+                            <h3 className="text-5xl font-black text-white uppercase tracking-tighter leading-none mb-3">
+                              {asset.symbol.includes(':') ? asset.symbol.split(':')[1] : asset.symbol}
+                            </h3>
+                            <p className="text-sm text-zinc-500 font-bold uppercase tracking-tight opacity-40">{asset.name}</p>
+                          </div>
+
+                          <div className="bg-black/40 p-6 rounded-[2rem] border border-white/5 backdrop-blur-3xl space-y-3 shadow-xl">
+                            <div className="flex items-baseline gap-2">
+                              <span className="text-zinc-700 font-black text-lg uppercase tracking-tighter italic">USD</span>
+                              <div className="text-4xl font-black text-white tracking-tighter leading-none">${asset.price}</div>
+                            </div>
+                            <div className={cn(
+                              "text-xl font-black px-6 py-3 rounded-xl border-2 flex items-center gap-4 justify-center",
+                              asset.trend === 'up' ? "text-emerald-500 bg-emerald-500/10 border-emerald-500/20 shadow-emerald-500/10" : "text-rose-500 bg-rose-500/10 border-rose-500/20 shadow-rose-500/10"
+                            )}>
+                              {asset.trend === 'up' ? <TrendingUp className="w-6 h-6" /> : <TrendingDown className="w-6 h-6" />}
+                              <span className="tracking-tighter">{asset.change}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="relative z-10 flex flex-col gap-3 mt-6">
+                          <button 
+                            onClick={() => handleAssetClick(asset.symbol)}
+                            className="w-full px-10 py-6 bg-white text-black rounded-[2rem] text-sm font-black uppercase tracking-widest hover:bg-emerald-400 transition-all shadow-2xl flex items-center justify-center gap-4"
+                          >
+                            <Globe className="w-5 h-5" />
+                            Expand View
+                          </button>
+                          <button 
+                            onClick={(e) => toggleStar(e, asset.symbol)}
+                            className="w-full px-10 py-6 bg-zinc-900 text-zinc-500 rounded-[2rem] text-xs font-black uppercase tracking-widest hover:bg-rose-500/20 hover:text-rose-500 transition-all border border-zinc-800 flex items-center justify-center gap-4 group/remove"
+                          >
+                            <Star className="w-5 h-5 group-hover/remove:rotate-90 transition-transform" />
+                            Dismiss Focus
+                          </button>
+                        </div>
+                      </div>
+                      
+                      {/* Right Chart Area */}
+                      <div className="flex-1 relative group/chart min-h-[600px] xl:h-[800px]">
+                        <TradingViewWidget symbol={asset.symbol} height={800} />
+                        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-zinc-950 via-zinc-950/20 to-transparent pointer-events-none h-48" />
+                        <div className="absolute top-8 right-8 px-4 py-2 bg-black/60 backdrop-blur-xl rounded-xl border border-white/10 flex items-center gap-3">
+                           <LayoutGrid className="w-4 h-4 text-emerald-500" />
+                           <span className="text-[10px] font-black text-white uppercase tracking-widest">Global Structure Feed</span>
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      <AIInsights starredSymbol={starredSymbol} />
+    </motion.div>
+  );
+};
+
 const Execution = ({ trades, onUpdateTrade, currency, hidePnL, user }: { trades: Trade[], onUpdateTrade: (id: string, updates: Partial<Trade>) => void, currency: string, hidePnL: boolean, user: User | null }) => {
   const [selectedTradeId, setSelectedTradeId] = useState<string | null>(trades[0]?.id || null);
   const selectedTrade = trades.find(t => t.id === selectedTradeId);
@@ -4596,6 +6335,7 @@ export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [dataLoading, setDataLoading] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
@@ -4645,6 +6385,7 @@ export default function App() {
       if (!user) return;
       
       setDataLoading(true);
+      setFetchError(null);
       try {
         const remoteAccounts = await dataService.getAccounts();
         if (remoteAccounts.length > 0) {
@@ -4677,8 +6418,13 @@ export default function App() {
           setSettings(newAcc.settings);
           setTrades([]);
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error('Error loading data from Supabase:', err);
+        if (err.message === 'Failed to fetch') {
+          setFetchError('Connectivity Error: Unable to reach the database. Trading data may be out of sync.');
+        } else {
+          setFetchError(`Sync Error: ${err.message || 'Unknown error occurred while syncing.'}`);
+        }
       } finally {
         setDataLoading(false);
       }
@@ -4835,33 +6581,44 @@ export default function App() {
 
   // Authentication listener
   useEffect(() => {
-    // Initial session check
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        setUser({
-          uid: session.user.id,
-          email: session.user.email || '',
-          displayName: session.user.user_metadata?.full_name || 'Trader'
-        });
-      }
-      setAuthLoading(false);
-    });
+    try {
+      // Initial session check
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session?.user) {
+          setUser({
+            uid: session.user.id,
+            email: session.user.email || '',
+            displayName: session.user.user_metadata?.full_name || 'Trader'
+          });
+        }
+        setAuthLoading(false);
+      }).catch(err => {
+        console.error('Initial session check failed:', err);
+        setAuthLoading(false);
+        if (err.message === 'Failed to fetch') {
+          setFetchError('Authentication server unreachable. Falling back to local state.');
+        }
+      });
 
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) {
-        setUser({
-          uid: session.user.id,
-          email: session.user.email || '',
-          displayName: session.user.user_metadata?.full_name || 'Trader'
-        });
-      } else {
-        setUser(null);
-      }
-      setAuthLoading(false);
-    });
+      // Listen for auth changes
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        if (session?.user) {
+          setUser({
+            uid: session.user.id,
+            email: session.user.email || '',
+            displayName: session.user.user_metadata?.full_name || 'Trader'
+          });
+        } else {
+          setUser(null);
+        }
+        setAuthLoading(false);
+      });
 
-    return () => subscription.unsubscribe();
+      return () => subscription.unsubscribe();
+    } catch (err) {
+      console.error('Supabase auth initialization failed:', err);
+      setAuthLoading(false);
+    }
   }, []);
 
   // Remove LocalStorage auto-save if user is logged in
@@ -4973,6 +6730,7 @@ export default function App() {
       settings.theme === 'carbon' ? "bg-[#171717] text-zinc-200" :
       "bg-[#0A0A0B] text-zinc-200"
     )}>
+      <NewFeatureNotification />
       {/* Liquid Glass Header */}
       <header className={cn(
         "fixed top-0 left-0 right-0 h-16 z-50 px-6 sm:px-12 flex items-center justify-between backdrop-blur-xl border-b transition-all shadow-xl",
@@ -5005,6 +6763,8 @@ export default function App() {
           {[
             { id: 'dashboard', label: 'Dashboard' },
             { id: 'journal', label: 'Journals' },
+            { id: 'markets', label: 'Markets', isNew: true },
+            { id: 'economic', label: 'Economics' },
             { id: 'execution', label: 'Execution' },
             { id: 'plan', label: 'My Plan' },
             { id: 'analytics', label: 'Analytics' },
@@ -5014,13 +6774,16 @@ export default function App() {
               key={item.id}
               onClick={() => setActiveTab(item.id)}
               className={cn(
-                "px-4 py-2 text-sm font-medium transition-all relative group rounded-full overflow-hidden",
+                "px-4 py-2 text-sm font-medium transition-all relative group rounded-full overflow-hidden flex items-center gap-2",
                 activeTab === item.id 
                   ? (settings.theme === 'light' ? "text-indigo-600" : "text-white") 
                   : (settings.theme === 'light' ? "text-zinc-500 hover:text-indigo-500" : "text-zinc-500 hover:text-zinc-300")
               )}
             >
               {item.label}
+              {(item as any).isNew && (
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              )}
               {activeTab === item.id && (
                 <motion.div 
                   layoutId="active-nav"
@@ -5034,6 +6797,30 @@ export default function App() {
             </button>
           ))}
         </nav>
+
+        <AnimatePresence>
+          {fetchError && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="px-4"
+            >
+              <div className="bg-rose-500/10 border border-rose-500/20 rounded-2xl p-2 px-3 flex items-center justify-between gap-3 shadow-lg shadow-rose-900/10 backdrop-blur-md">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="w-3 h-3 text-rose-500" />
+                  <p className="text-[9px] font-black text-rose-400 uppercase tracking-widest leading-none">{fetchError}</p>
+                </div>
+                <button 
+                  onClick={() => setFetchError(null)}
+                  className="p-1 hover:bg-rose-500/10 rounded-full transition-colors"
+                >
+                  <X className="w-3 h-3 text-rose-500" />
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         <div className="flex items-center gap-4">
           <div className="hidden md:flex flex-col items-end mr-2">
@@ -5152,6 +6939,8 @@ export default function App() {
                   {[
                     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
                     { id: 'journal', label: 'Market Journal', icon: BookOpen },
+                    { id: 'economic', label: 'Economics', icon: Calendar },
+                    { id: 'markets', label: 'Markets', icon: Globe },
                     { id: 'execution', label: 'Execution', icon: History },
                     { id: 'plan', label: 'My Strategy', icon: Target },
                     { id: 'analytics', label: 'Performance', icon: BarChart3 },
@@ -5214,6 +7003,8 @@ export default function App() {
                   />
                 )}
                 {activeTab === 'execution' && <Execution trades={sortedTrades} onUpdateTrade={handleUpdateTrade} currency={settings.currency} hidePnL={settings.hidePnL} user={user} />}
+                {activeTab === 'markets' && <Markets />}
+                {activeTab === 'economic' && <EconomicCalendar />}
                 {activeTab === 'plan' && (
                   <Plan 
                     settings={settings} 
