@@ -1398,6 +1398,17 @@ const TradeJournal = ({ trades, onAddTrade, onUpdateTrade, onDeleteTrade, settin
   const [exitDate, setExitDate] = useState<string>(new Date().toISOString());
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
 
   useEffect(() => {
     const resolve = async () => {
@@ -1834,14 +1845,25 @@ const TradeJournal = ({ trades, onAddTrade, onUpdateTrade, onDeleteTrade, settin
               <div className="mt-6">
                  <span className="text-[10px] text-zinc-500 uppercase tracking-widest block mb-2">Trade Chart</span>
                  <div 
-                   className="aspect-video bg-zinc-950 rounded-2xl border border-zinc-800 border-dashed flex flex-col items-center justify-center gap-3 group/chart cursor-pointer hover:bg-zinc-900 transition-all overflow-hidden relative"
-                   onClick={() => {
-                     if (selectedTrade.screenshot) {
-                       setIsFullscreen(true);
-                     } else {
-                       fileInputRefDetail.current?.click();
-                     }
-                   }}
+                   className={cn(
+                      "aspect-video bg-zinc-950 rounded-2xl border border-dashed flex flex-col items-center justify-center gap-3 group/chart cursor-pointer transition-all overflow-hidden relative",
+                      isDragging ? "bg-zinc-900 border-emerald-500 scale-[0.99] shadow-lg shadow-emerald-500/10" : "bg-zinc-950 border-zinc-800 hover:bg-zinc-900"
+                    )}
+                    onClick={() => {
+                      if (selectedTrade.screenshot) {
+                        setIsFullscreen(true);
+                      } else {
+                        fileInputRefDetail.current?.click();
+                      }
+                    }}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setIsDragging(false);
+                      const file = e.dataTransfer.files?.[0];
+                      if (file) handleDetailUpload(file);
+                    }}
                  >
                     <input 
                       type="file" 
@@ -1883,7 +1905,7 @@ const TradeJournal = ({ trades, onAddTrade, onUpdateTrade, onDeleteTrade, settin
                           <Plus className="w-5 h-5 text-zinc-600" />
                         </div>
                         <p className="text-xs text-zinc-600">
-                          {isUploadingDetail ? 'Uploading...' : 'Click to upload screenshot'}
+                          {isDragging ? 'Drop Image Here' : (isUploadingDetail ? 'Uploading...' : 'Click to upload screenshot')}
                         </p>
                       </>
                     )}
@@ -2054,23 +2076,29 @@ const TradeJournal = ({ trades, onAddTrade, onUpdateTrade, onDeleteTrade, settin
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">Entry Date & Time</label>
-                    <input 
-                      name="entryDate" 
-                      type="datetime-local"
-                      defaultValue={format(parseISO(entryDate), "yyyy-MM-dd'T'HH:mm")}
-                      required 
-                      className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-2 text-zinc-100 focus:ring-1 focus:ring-emerald-500 outline-none" 
-                    />
+                    <div className="relative group">
+                      <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 pointer-events-none group-focus-within:text-emerald-500 transition-colors" />
+                      <input 
+                        name="entryDate" 
+                        type="datetime-local"
+                        defaultValue={format(parseISO(entryDate), "yyyy-MM-dd'T'HH:mm")}
+                        required 
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg pl-10 pr-4 py-2 text-zinc-100 focus:ring-1 focus:ring-emerald-500 outline-none [color-scheme:dark]" 
+                      />
+                    </div>
                   </div>
                   <div>
                     <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">Exit Date & Time</label>
-                    <input 
-                      name="exitDate" 
-                      type="datetime-local"
-                      defaultValue={format(parseISO(exitDate), "yyyy-MM-dd'T'HH:mm")}
-                      required 
-                      className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-2 text-zinc-100 focus:ring-1 focus:ring-emerald-500 outline-none" 
-                    />
+                    <div className="relative group">
+                      <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 pointer-events-none group-focus-within:text-emerald-500 transition-colors" />
+                      <input 
+                        name="exitDate" 
+                        type="datetime-local"
+                        defaultValue={format(parseISO(exitDate), "yyyy-MM-dd'T'HH:mm")}
+                        required 
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg pl-10 pr-4 py-2 text-zinc-100 focus:ring-1 focus:ring-emerald-500 outline-none [color-scheme:dark]" 
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -2335,8 +2363,19 @@ const TradeJournal = ({ trades, onAddTrade, onUpdateTrade, onDeleteTrade, settin
                 <div>
                   <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">Trade Chart Screenshot</label>
                   <div 
-                    className="aspect-video bg-zinc-950 rounded-2xl border border-zinc-800 border-dashed flex flex-col items-center justify-center gap-3 group/chart cursor-pointer hover:bg-zinc-900 transition-all overflow-hidden relative"
+                    className={cn(
+                      "aspect-video bg-zinc-950 rounded-2xl border border-dashed flex flex-col items-center justify-center gap-3 group/chart cursor-pointer transition-all overflow-hidden relative",
+                      isDragging ? "bg-zinc-900 border-emerald-500 scale-[0.99] shadow-lg shadow-emerald-500/10" : "bg-zinc-950 border-zinc-800 hover:bg-zinc-900"
+                    )}
                     onClick={() => fileInputRef.current?.click()}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setIsDragging(false);
+                      const file = e.dataTransfer.files?.[0];
+                      if (file) handleScreenshotUpload(file);
+                    }}
                   >
                     <input 
                       type="file" 
@@ -2361,7 +2400,7 @@ const TradeJournal = ({ trades, onAddTrade, onUpdateTrade, onDeleteTrade, settin
                           <Plus className="w-5 h-5 text-zinc-600" />
                         </div>
                         <p className="text-xs text-zinc-600">
-                          {isUploading ? 'Uploading...' : 'Click to upload screenshot'}
+                          {isDragging ? 'Drop Image Here' : (isUploading ? 'Uploading...' : 'Click to upload screenshot')}
                         </p>
                       </>
                     )}
@@ -2396,6 +2435,17 @@ const Analytics = ({ trades, currency, hidePnL, user, profileName, onUpdateTrade
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
 
   const handleScreenshotUpload = async (file: File) => {
     if (!selectedTrade || !user || !file.type.startsWith('image/')) return;
@@ -3074,14 +3124,25 @@ const Analytics = ({ trades, currency, hidePnL, user, profileName, onUpdateTrade
               <div className="mt-6">
                  <span className="text-[10px] text-zinc-500 uppercase tracking-widest block mb-2">Trade Chart</span>
                  <div 
-                   className="aspect-video bg-zinc-950 rounded-2xl border border-zinc-800 border-dashed flex flex-col items-center justify-center gap-3 group/chart cursor-pointer hover:bg-zinc-900 transition-all overflow-hidden relative"
-                   onClick={() => {
-                     if (selectedTrade.screenshot) {
-                       setIsFullscreen(true);
-                     } else {
-                       fileInputRef.current?.click();
-                     }
-                   }}
+                   className={cn(
+                      "aspect-video bg-zinc-950 rounded-2xl border border-dashed flex flex-col items-center justify-center gap-3 group/chart cursor-pointer transition-all overflow-hidden relative",
+                      isDragging ? "bg-zinc-900 border-emerald-500 scale-[0.99] shadow-lg shadow-emerald-500/10" : "bg-zinc-950 border-zinc-800 hover:bg-zinc-900"
+                    )}
+                    onClick={() => {
+                      if (selectedTrade.screenshot) {
+                        setIsFullscreen(true);
+                      } else {
+                        fileInputRef.current?.click();
+                      }
+                    }}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setIsDragging(false);
+                      const file = e.dataTransfer.files?.[0];
+                      if (file) handleScreenshotUpload(file);
+                    }}
                  >
                     <input 
                       type="file" 
@@ -3123,7 +3184,7 @@ const Analytics = ({ trades, currency, hidePnL, user, profileName, onUpdateTrade
                           <Plus className="w-5 h-5 text-zinc-600" />
                         </div>
                         <p className="text-xs text-zinc-600">
-                          {isUploading ? 'Uploading...' : 'Click to upload screenshot'}
+                          {isDragging ? 'Drop Image Here' : (isUploading ? 'Uploading...' : 'Click to upload screenshot')}
                         </p>
                       </>
                     )}
