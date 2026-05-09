@@ -519,6 +519,10 @@ const AuthPage = ({ onAuthComplete, theme, embedded = false }: AuthPageProps) =>
           </div>
         </div>
       </motion.div>
+
+      <div className="fixed bottom-0 left-0 w-full z-50">
+        <FuturesMarquee />
+      </div>
     </div>
   );
 };
@@ -5151,8 +5155,80 @@ const BankForecast = () => {
     );
 };
 
+const FuturesMarquee = () => {
+  const assets = [
+    { symbol: 'GC1!', name: 'Gold', price: '2,342.50', change: '+1.2%' },
+    { symbol: 'CL1!', name: 'Crude Oil', price: '78.45', change: '-0.5%' },
+    { symbol: 'ES1!', name: 'S&P 500', price: '5,234.25', change: '+0.8%' },
+    { symbol: 'NQ1!', name: 'Nasdaq 100', price: '18,456.75', change: '+1.1%' },
+    { symbol: 'YM1!', name: 'Dow Jones', price: '39,123.00', change: '+0.4%' },
+    { symbol: 'BTC1!', name: 'Bitcoin Futures', price: '64,230', change: '-2.3%' },
+    { symbol: 'NG1!', name: 'Natural Gas', price: '2.145', change: '+4.2%' },
+    { symbol: 'SI1!', name: 'Silver', price: '28.14', change: '-0.2%' },
+    { symbol: '6E1!', name: 'Euro FX', price: '1.0845', change: '+0.15%' },
+    { symbol: 'UB1!', name: 'Ultra Bond', price: '118.24', change: '-0.32%' },
+  ];
+
+  return (
+    <div className="w-full bg-black/40 backdrop-blur-xl border-y border-white/5 py-4 overflow-hidden relative group">
+      <div className="absolute inset-y-0 left-0 w-20 bg-gradient-to-r from-black to-transparent z-10" />
+      <div className="absolute inset-y-0 right-0 w-20 bg-gradient-to-l from-black to-transparent z-10" />
+      
+      <motion.div 
+        animate={{ x: ["0%", "-50%"] }}
+        transition={{ 
+          duration: 30, 
+          repeat: Infinity, 
+          ease: "linear" 
+        }}
+        className="flex whitespace-nowrap"
+      >
+        {[...assets, ...assets].map((asset, idx) => (
+          <div key={idx} className="inline-flex items-center gap-6 px-12 border-r border-white/5 h-10">
+            <div className="flex flex-col">
+              <span className="text-[9px] font-black text-zinc-500 tracking-[0.2em] uppercase leading-none mb-1">{asset.name}</span>
+              <span className="text-sm font-black text-white tracking-tighter leading-none">{asset.symbol}</span>
+            </div>
+            <div className="flex flex-col items-end">
+              <span className="text-sm font-black text-white tracking-tighter leading-none mb-1">{asset.price}</span>
+              <span className={cn(
+                "text-[9px] font-black uppercase tracking-widest leading-none",
+                asset.change.startsWith('+') ? "text-emerald-500" : "text-rose-500"
+              )}>{asset.change}</span>
+            </div>
+          </div>
+        ))}
+      </motion.div>
+    </div>
+  );
+};
+
 const MarketBannerSlider = () => {
   const [currentSlide, setCurrentSlide] = useState(0);
+  const [activeUsers, setActiveUsers] = useState<{name: string, pair: string, time: string}[]>([]);
+
+  useEffect(() => {
+    const names = ['Michael T.', 'Sarah Jenkins', 'Petar G.', 'Jessica L.', 'David R.', 'Emma S.', 'Chris W.', 'Sophia Z.', 'Liam H.', 'Olivia F.'];
+    const pairs = ['BTC/USD', 'XAU/USD', 'EUR/USD', 'GBP/JPY', 'NAS100', 'US30', 'ETH/USD', 'OIL/USD', 'USD/JPY', 'SOL/USD'];
+    
+    const generateUsers = () => {
+      const count = 4;
+      const shuffled = [...names].sort(() => 0.5 - Math.random());
+      return shuffled.slice(0, count).map(name => ({
+        name,
+        pair: pairs[Math.floor(Math.random() * pairs.length)],
+        time: 'Just now'
+      }));
+    };
+
+    setActiveUsers(generateUsers());
+    
+    const interval = setInterval(() => {
+      setActiveUsers(generateUsers());
+    }, 4000);
+    
+    return () => clearInterval(interval);
+  }, []);
   
   const slides = [
     {
@@ -5166,7 +5242,7 @@ const MarketBannerSlider = () => {
           <div className="flex -space-x-3">
             {[1, 2, 3, 4].map(i => (
               <div key={i} className="w-10 h-10 rounded-full border-2 border-indigo-600 bg-zinc-900 flex items-center justify-center text-[10px] font-black text-white uppercase overflow-hidden">
-                <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=trader${i}`} alt="User" referrerPolicy="no-referrer" />
+                <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=trader${i + Math.random()}`} alt="User" referrerPolicy="no-referrer" />
               </div>
             ))}
           </div>
@@ -5182,12 +5258,21 @@ const MarketBannerSlider = () => {
       badge: "Community",
       extra: (
         <div className="flex flex-wrap gap-3">
-          {['Alex G.', 'Sarah M.', 'Ken K.', 'Elena R.'].map(user => (
-            <div key={user} className="px-3 py-1 bg-white/10 rounded-lg flex items-center gap-2 border border-white/10">
-              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-[10px] font-bold text-white">{user} starred BTCUSD</span>
-            </div>
-          ))}
+          <AnimatePresence mode="popLayout">
+            {activeUsers.map(user => (
+              <motion.div 
+                key={user.name}
+                initial={{ opacity: 0, scale: 0.9, y: 10 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9, y: -10 }}
+                className="px-3 py-1.5 bg-white/10 rounded-xl flex items-center gap-2 border border-white/10"
+              >
+                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
+                <span className="text-[10px] font-black text-white uppercase tracking-tight">{user.name}</span>
+                <span className="text-[9px] font-medium text-white/60 uppercase tracking-tight">starred {user.pair}</span>
+              </motion.div>
+            ))}
+          </AnimatePresence>
         </div>
       )
     },
@@ -7200,6 +7285,9 @@ export default function App() {
                 )}
               </motion.div>
             </AnimatePresence>
+            <div className="mt-12 md:mt-20">
+              <FuturesMarquee />
+            </div>
             <Footer 
               theme={settings.theme} 
               onOpenPrivacy={() => setShowPrivacy(true)}
