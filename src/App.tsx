@@ -121,7 +121,7 @@ const NewFeatureNotification = () => {
     </AnimatePresence>
   );
 };
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   LineChart, 
@@ -4651,7 +4651,6 @@ const BankForecast = () => {
   const [selectedAsset, setSelectedAsset] = useState('ES1!');
   const [activeDay, setActiveDay] = useState(format(new Date(), 'EEEE'));
   const [timezone, setTimezone] = useState<'EST' | 'PHT'>('EST');
-  const [expandedNewsId, setExpandedNewsId] = useState<number | null>(null);
   
   const convertTime = (timeEST: string, targetTz: 'EST' | 'PHT') => {
     if (targetTz === 'EST') return timeEST;
@@ -4952,12 +4951,8 @@ const BankForecast = () => {
                 {currentNews.map((news) => (
                   <motion.div 
                     key={news.id}
-                    layout
-                    initial={false}
-                    className={cn(
-                      "group bg-black/40 border border-zinc-800/80 hover:border-indigo-500/40 rounded-3xl p-6 transition-all shadow-xl",
-                      expandedNewsId === news.id && "border-indigo-500/50 bg-zinc-900/40 shadow-indigo-500/10"
-                    )}
+                    whileHover={{ scale: 1.005 }}
+                    className="group bg-black/40 border border-zinc-800/80 hover:border-indigo-500/40 rounded-3xl p-6 transition-all shadow-xl"
                   >
                     <div className="flex flex-col gap-6">
                       <div className="flex items-center justify-between">
@@ -4980,105 +4975,101 @@ const BankForecast = () => {
                             </div>
                          </div>
 
-                         <button 
-                           onClick={() => setExpandedNewsId(expandedNewsId === news.id ? null : news.id)}
-                           className={cn(
-                             "w-10 h-10 rounded-xl bg-zinc-900 border border-white/5 flex items-center justify-center transition-all",
-                             expandedNewsId === news.id ? "bg-white text-black scale-110" : "hover:bg-white hover:text-black"
-                           )}
-                         >
-                           {expandedNewsId === news.id ? <X className="w-4 h-4" /> : <Info className="w-4 h-4" />}
-                         </button>
-                      </div>
-
-                      <AnimatePresence>
-                        {expandedNewsId === news.id && (
-                          <motion.div
-                            initial={{ height: 0, opacity: 0 }}
-                            animate={{ height: 'auto', opacity: 1 }}
-                            exit={{ height: 0, opacity: 0 }}
-                            className="overflow-hidden"
-                          >
-                            <div className="space-y-6 pt-6 border-t border-white/5">
-                              <div className="space-y-3">
-                                <div className="flex items-center gap-3">
-                                  <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
-                                    <ShieldCheck className="w-4 h-4 text-emerald-500" />
-                                  </div>
-                                  <span className="text-[10px] font-black text-white uppercase tracking-widest">Institutional Bank Forecast Analysis</span>
+                         <div className="group/info relative shrink-0">
+                            <button className="w-10 h-10 rounded-xl bg-zinc-900 border border-white/5 flex items-center justify-center hover:bg-white hover:text-black transition-all">
+                              <Info className="w-4 h-4" />
+                            </button>
+                            <div className="absolute bottom-full right-0 mb-4 w-72 p-6 bg-zinc-950 border border-zinc-800 rounded-[2rem] shadow-[0_30px_60px_rgba(0,0,0,0.8)] opacity-0 invisible group-hover/info:opacity-100 group-hover/info:visible transition-all z-50 backdrop-blur-3xl">
+                              <div className="flex items-center gap-3 mb-4 pb-4 border-b border-white/5">
+                                <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                                  <Info className="w-4 h-4 text-emerald-500" />
                                 </div>
-                                <p className="text-xs font-medium text-zinc-400 leading-relaxed uppercase tracking-tight bg-zinc-950/30 p-4 rounded-xl border border-white/5">{news.desc}</p>
-                                <div className="p-4 bg-emerald-500/5 rounded-xl border border-emerald-500/10">
-                                   <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest block mb-1">Institutional Consensus</span>
-                                   <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-tight italic">"{news.keyPoint}"</p>
-                                </div>
+                                <span className="text-[10px] font-black text-white uppercase tracking-widest">Institutional Bank Forecast</span>
                               </div>
-
-                              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-zinc-950/50 rounded-2xl border border-white/5">
-                                <div className="space-y-1">
-                                  <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest">Duration</span>
-                                  <div className="flex items-center gap-2">
-                                     <Clock className="w-3 h-3 text-zinc-500" />
-                                     <span className="text-[10px] font-black text-zinc-300 uppercase">{news.duration}</span>
-                                  </div>
-                                </div>
-                                <div className="space-y-1">
-                                  <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest">Release Status</span>
-                                  <div className="flex items-center gap-2">
-                                     <div className={cn(
-                                       "w-1.5 h-1.5 rounded-full",
-                                       news.status === 'In Focus' ? "bg-emerald-500 animate-pulse" : 
-                                       news.status === 'Released' ? "bg-white/40" : "bg-zinc-700"
-                                     )} />
-                                     <span className={cn(
-                                       "text-[9px] font-black uppercase tracking-tighter",
-                                       news.status === 'In Focus' ? "text-emerald-500" : 
-                                       news.status === 'Released' ? "text-zinc-500" : "text-zinc-500"
-                                     )}>{news.status}</span>
-                                  </div>
-                                </div>
-                                <div className="space-y-1">
-                                  <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest">Forecast</span>
-                                  <span className="text-[10px] font-black text-white block">{news.forecast}</span>
-                                </div>
-                                <div className="space-y-1">
-                                  <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest">Previous</span>
-                                  <span className="text-[10px] font-black text-white block">{news.previous}</span>
-                                </div>
-                              </div>
-
-                              <div className="flex flex-col md:flex-row gap-3">
-                                <div className="flex-1 p-4 bg-emerald-500/5 rounded-2xl border border-emerald-500/10 group/p">
-                                  <div className="flex items-center justify-between mb-2">
-                                     <span className="text-[8px] font-black text-emerald-500 uppercase tracking-widest">Above Forecast</span>
-                                     <TrendingUp className="w-3 h-3 text-emerald-500 group-hover/p:rotate-12 transition-transform" />
-                                  </div>
-                                  <p className="text-[10px] font-black text-white uppercase tracking-tight">{news.impact === 'high' ? 'Very Bullish' : 'Bullish'}</p>
-                                  <span className="text-[8px] font-bold text-emerald-500/60 uppercase tracking-widest leading-none">Expansion Target</span>
-                                </div>
-                                
-                                <div className="flex-1 p-4 bg-zinc-900/50 rounded-2xl border border-white/5 group/p">
-                                  <div className="flex items-center justify-between mb-2">
-                                     <span className="text-[8px] font-black text-zinc-500 uppercase tracking-widest">On Forecast</span>
-                                     <RotateCw className="w-3 h-3 text-zinc-500 group-hover/p:rotate-180 transition-transform duration-700" />
-                                  </div>
-                                  <p className="text-[10px] font-black text-white uppercase tracking-tight">Ranging</p>
-                                  <span className="text-[8px] font-bold text-zinc-600 uppercase tracking-widest leading-none">Equilibrium</span>
-                                </div>
-
-                                <div className="flex-1 p-4 bg-rose-500/5 rounded-2xl border border-rose-500/10 group/p">
-                                  <div className="flex items-center justify-between mb-2">
-                                     <span className="text-[8px] font-black text-rose-500 uppercase tracking-widest">Below Forecast</span>
-                                     <TrendingDown className="w-3 h-3 text-rose-500 group-hover/p:-rotate-12 transition-transform" />
-                                  </div>
-                                  <p className="text-[10px] font-black text-white uppercase tracking-tight">{news.impact === 'high' ? 'Very Bearish' : 'Bearish'}</p>
-                                  <span className="text-[8px] font-bold text-rose-500/60 uppercase tracking-widest leading-none">Structural Break</span>
-                                </div>
+                              <p className="text-xs font-medium text-zinc-400 leading-relaxed uppercase tracking-tight">{news.desc}</p>
+                              <div className="mt-4 pt-4 border-t border-white/5">
+                                 <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest block mb-1">Key Takeaway</span>
+                                 <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-tight italic">"{news.keyPoint}"</p>
                               </div>
                             </div>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
+                         </div>
+                      </div>
+
+                      <div className="space-y-4 pt-6 border-t border-white/5">
+                        <div className="flex items-center gap-2">
+                           <ShieldCheck className="w-3 h-3 text-indigo-400" />
+                           <span className="text-[8px] font-black text-zinc-500 uppercase tracking-[0.2em]">Institutional Bank Forecast Detail</span>
+                        </div>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-zinc-950/50 rounded-2xl border border-white/5">
+                          <div className="space-y-1">
+                            <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest">Duration</span>
+                            <div className="flex items-center gap-2">
+                               <Clock className="w-3 h-3 text-zinc-500" />
+                               <span className="text-[10px] font-black text-zinc-300 uppercase">{news.duration}</span>
+                            </div>
+                          </div>
+                          <div className="space-y-1">
+                            <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest">Release Status</span>
+                            <div className="flex items-center gap-2">
+                               <div className={cn(
+                                 "w-1.5 h-1.5 rounded-full",
+                                 news.status === 'In Focus' ? "bg-emerald-500 animate-pulse" : 
+                                 news.status === 'Released' ? "bg-white/40" : "bg-zinc-700"
+                               )} />
+                               <span className={cn(
+                                 "text-[9px] font-black uppercase tracking-tighter",
+                                 news.status === 'In Focus' ? "text-emerald-500" : 
+                                 news.status === 'Released' ? "text-zinc-500" : "text-zinc-500"
+                               )}>{news.status}</span>
+                               {news.status === 'In Focus' && (
+                                 <div className="flex items-end gap-0.5 h-3">
+                                   <motion.div animate={{ height: [4, 8, 4] }} transition={{ repeat: Infinity, duration: 1 }} className="w-1 bg-emerald-500 rounded-full" />
+                                   <motion.div animate={{ height: [8, 12, 8] }} transition={{ repeat: Infinity, duration: 1, delay: 0.2 }} className="w-1 bg-emerald-500 rounded-full" />
+                                   <motion.div animate={{ height: [6, 10, 6] }} transition={{ repeat: Infinity, duration: 1, delay: 0.4 }} className="w-1 bg-emerald-500 rounded-full" />
+                                 </div>
+                               )}
+                            </div>
+                          </div>
+                          <div className="space-y-1">
+                            <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest">Forecast</span>
+                            <span className="text-[10px] font-black text-white block">{news.forecast}</span>
+                          </div>
+                          <div className="space-y-1">
+                            <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest">Previous</span>
+                            <span className="text-[10px] font-black text-white block">{news.previous}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Playbook Scenarios (Inline) */}
+                      <div className="flex flex-col md:flex-row gap-3 pt-6 border-t border-white/5">
+                        <div className="flex-1 p-4 bg-emerald-500/5 rounded-2xl border border-emerald-500/10 group/p">
+                          <div className="flex items-center justify-between mb-2">
+                             <span className="text-[8px] font-black text-emerald-500 uppercase tracking-widest">Above Forecast</span>
+                             <TrendingUp className="w-3 h-3 text-emerald-500 group-hover/p:rotate-12 transition-transform" />
+                          </div>
+                          <p className="text-[10px] font-black text-white uppercase tracking-tight">{news.impact === 'high' ? 'Very Bullish' : 'Bullish'}</p>
+                          <span className="text-[8px] font-bold text-emerald-500/60 uppercase tracking-widest leading-none">Expansion Target</span>
+                        </div>
+                        
+                        <div className="flex-1 p-4 bg-zinc-900/50 rounded-2xl border border-white/5 group/p">
+                          <div className="flex items-center justify-between mb-2">
+                             <span className="text-[8px] font-black text-zinc-500 uppercase tracking-widest">On Forecast</span>
+                             <RotateCw className="w-3 h-3 text-zinc-500 group-hover/p:rotate-180 transition-transform duration-700" />
+                          </div>
+                          <p className="text-[10px] font-black text-white uppercase tracking-tight">Ranging</p>
+                          <span className="text-[8px] font-bold text-zinc-600 uppercase tracking-widest leading-none">Equilibrium</span>
+                        </div>
+
+                        <div className="flex-1 p-4 bg-rose-500/5 rounded-2xl border border-rose-500/10 group/p">
+                          <div className="flex items-center justify-between mb-2">
+                             <span className="text-[8px] font-black text-rose-500 uppercase tracking-widest">Below Forecast</span>
+                             <TrendingDown className="w-3 h-3 text-rose-500 group-hover/p:-rotate-12 transition-transform" />
+                          </div>
+                          <p className="text-[10px] font-black text-white uppercase tracking-tight">{news.impact === 'high' ? 'Very Bearish' : 'Bearish'}</p>
+                          <span className="text-[8px] font-bold text-rose-500/60 uppercase tracking-widest leading-none">Structural Break</span>
+                        </div>
+                      </div>
                     </div>
                   </motion.div>
                 ))}
@@ -5281,35 +5272,64 @@ const AIInsights = ({ starredSymbol }: { starredSymbol: string | null }) => {
     probabilities: { bullish: number, neutral: number, bearish: number }
   } | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const getInsights = async () => {
     if (!starredSymbol) return;
     setLoading(true);
+    setAnalysis(null);
+    setError(null);
     try {
+      if (!process.env.GEMINI_API_KEY) {
+        throw new Error('GEMINI_API_KEY is not configured. Please check your environment settings.');
+      }
+
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
       const prompt = `Act as a senior market analyst. Analyze the following asset: ${starredSymbol}. 
-      Provide:
-      1. Sentiment (bullish/bearish/neutral)
-      2. Confidence score (0-100)
-      3. Reasoning (2-3 sentences)
-      4. Prediction market probabilities (bullish, neutral, bearish summing to 100)
-      
-      Respond ONLY in JSON: {
-        "sentiment": "bullish" | "bearish" | "neutral",
-        "confidence": number,
-        "reasoning": "string",
-        "probabilities": { "bullish": number, "neutral": number, "bearish": number }
-      }`;
+      Provide a deep analysis into the current market sentiment, confidence level, and detailed reasoning.
+      Also provide prediction market probabilities for bullish, neutral, and bearish scenarios.`;
       
       const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
         contents: [{ parts: [{ text: prompt }] }],
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              sentiment: {
+                type: Type.STRING,
+                enum: ["bullish", "bearish", "neutral"],
+                description: "The overall market sentiment."
+              },
+              confidence: {
+                type: Type.NUMBER,
+                description: "Confidence score from 0 to 100."
+              },
+              reasoning: {
+                type: Type.STRING,
+                description: "Two to three sentences explaining the analysis."
+              },
+              probabilities: {
+                type: Type.OBJECT,
+                properties: {
+                  bullish: { type: Type.NUMBER },
+                  neutral: { type: Type.NUMBER },
+                  bearish: { type: Type.NUMBER }
+                },
+                required: ["bullish", "neutral", "bearish"]
+              }
+            },
+            required: ["sentiment", "confidence", "reasoning", "probabilities"]
+          }
+        }
       });
+      
       const text = response.text || "";
-      const cleanedText = text.replace(/```json|```/g, '').trim();
-      setAnalysis(JSON.parse(cleanedText));
-    } catch (err) {
-      console.error(err);
+      setAnalysis(JSON.parse(text));
+    } catch (err: any) {
+      console.error('AI Insights Error:', err);
+      setError(err?.message || 'Failed to generate market insights. Ensure your connection and API key are valid.');
       setAnalysis(null);
     } finally {
       setLoading(false);
@@ -5339,7 +5359,20 @@ const AIInsights = ({ starredSymbol }: { starredSymbol: string | null }) => {
           </div>
         ) : (
           <div className="space-y-8">
-            {!analysis && !loading && (
+            {error && (
+              <div className="p-6 bg-rose-500/10 border border-rose-500/20 rounded-2xl flex flex-col items-center gap-3">
+                <AlertCircle className="w-8 h-8 text-rose-500" />
+                <p className="text-[10px] font-black text-rose-400 uppercase tracking-widest text-center">{error}</p>
+                <button 
+                  onClick={getInsights}
+                  className="px-6 py-2 bg-rose-500 text-black text-[9px] font-black uppercase tracking-widest rounded-lg hover:bg-rose-400 transition-all"
+                >
+                  Retry Analysis
+                </button>
+              </div>
+            )}
+
+            {!analysis && !loading && !error && (
               <button 
                 onClick={getInsights}
                 className="w-full py-6 bg-zinc-900 hover:bg-zinc-800 text-white rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest border border-zinc-800 transition-all flex items-center justify-center gap-3 shadow-2xl shadow-emerald-500/5 shadow-indigo-500/10"
@@ -6335,7 +6368,6 @@ export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [dataLoading, setDataLoading] = useState(false);
-  const [fetchError, setFetchError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
@@ -6385,7 +6417,6 @@ export default function App() {
       if (!user) return;
       
       setDataLoading(true);
-      setFetchError(null);
       try {
         const remoteAccounts = await dataService.getAccounts();
         if (remoteAccounts.length > 0) {
@@ -6418,13 +6449,8 @@ export default function App() {
           setSettings(newAcc.settings);
           setTrades([]);
         }
-      } catch (err: any) {
+      } catch (err) {
         console.error('Error loading data from Supabase:', err);
-        if (err.message === 'Failed to fetch') {
-          setFetchError('Connectivity Error: Unable to reach the database. Trading data may be out of sync.');
-        } else {
-          setFetchError(`Sync Error: ${err.message || 'Unknown error occurred while syncing.'}`);
-        }
       } finally {
         setDataLoading(false);
       }
@@ -6581,44 +6607,33 @@ export default function App() {
 
   // Authentication listener
   useEffect(() => {
-    try {
-      // Initial session check
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        if (session?.user) {
-          setUser({
-            uid: session.user.id,
-            email: session.user.email || '',
-            displayName: session.user.user_metadata?.full_name || 'Trader'
-          });
-        }
-        setAuthLoading(false);
-      }).catch(err => {
-        console.error('Initial session check failed:', err);
-        setAuthLoading(false);
-        if (err.message === 'Failed to fetch') {
-          setFetchError('Authentication server unreachable. Falling back to local state.');
-        }
-      });
-
-      // Listen for auth changes
-      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-        if (session?.user) {
-          setUser({
-            uid: session.user.id,
-            email: session.user.email || '',
-            displayName: session.user.user_metadata?.full_name || 'Trader'
-          });
-        } else {
-          setUser(null);
-        }
-        setAuthLoading(false);
-      });
-
-      return () => subscription.unsubscribe();
-    } catch (err) {
-      console.error('Supabase auth initialization failed:', err);
+    // Initial session check
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        setUser({
+          uid: session.user.id,
+          email: session.user.email || '',
+          displayName: session.user.user_metadata?.full_name || 'Trader'
+        });
+      }
       setAuthLoading(false);
-    }
+    });
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        setUser({
+          uid: session.user.id,
+          email: session.user.email || '',
+          displayName: session.user.user_metadata?.full_name || 'Trader'
+        });
+      } else {
+        setUser(null);
+      }
+      setAuthLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   // Remove LocalStorage auto-save if user is logged in
@@ -6797,30 +6812,6 @@ export default function App() {
             </button>
           ))}
         </nav>
-
-        <AnimatePresence>
-          {fetchError && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="px-4"
-            >
-              <div className="bg-rose-500/10 border border-rose-500/20 rounded-2xl p-2 px-3 flex items-center justify-between gap-3 shadow-lg shadow-rose-900/10 backdrop-blur-md">
-                <div className="flex items-center gap-2">
-                  <AlertCircle className="w-3 h-3 text-rose-500" />
-                  <p className="text-[9px] font-black text-rose-400 uppercase tracking-widest leading-none">{fetchError}</p>
-                </div>
-                <button 
-                  onClick={() => setFetchError(null)}
-                  className="p-1 hover:bg-rose-500/10 rounded-full transition-colors"
-                >
-                  <X className="w-3 h-3 text-rose-500" />
-                </button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
 
         <div className="flex items-center gap-4">
           <div className="hidden md:flex flex-col items-end mr-2">
