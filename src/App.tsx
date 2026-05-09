@@ -4466,7 +4466,12 @@ const AINewsAnalysis = ({ news, includeFutures = true }: { news: any[], includeF
   const analyzeNews = async () => {
     setLoading(true);
     try {
-      const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
+      const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY || '';
+      if (!apiKey) {
+        setLoading(false);
+        return;
+      }
+      const genAI = new GoogleGenAI({ apiKey });
       
       const prompt = `Act as a senior Quantitative Analyst. Analyze the following global news events for the current week and provide a deep market sentiment analysis${includeFutures ? ' specifically focusing on Indices, Commodities, and Futures (CME/CBOT)' : ''}. 
       
@@ -5435,10 +5440,18 @@ const AIInsights = ({ starredSymbol }: { starredSymbol: string | null }) => {
     sentiment: 'bullish' | 'bearish' | 'neutral',
     confidence: number,
     reasoning: string,
-    probabilities: { bullish: number, neutral: number, bearish: number }
+    probabilities: { bullish: number, neutral: number, bearish: number },
+    key_levels?: { type: string, price: string, rationale: string }[]
   } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Auto-trigger analysis when seeded with a symbol
+  useEffect(() => {
+    if (starredSymbol && !analysis && !loading && !error) {
+       getInsights();
+    }
+  }, [starredSymbol]);
 
   const getInsights = async () => {
     if (!starredSymbol) return;
@@ -5446,53 +5459,47 @@ const AIInsights = ({ starredSymbol }: { starredSymbol: string | null }) => {
     setAnalysis(null);
     setError(null);
     try {
-      if (!process.env.GEMINI_API_KEY) {
-        throw new Error('GEMINI_API_KEY is not configured. Please check your environment settings.');
+      const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
+      
+      if (!apiKey) {
+        setError('API_KEY_MISSING');
+        setLoading(false);
+        return;
       }
 
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-      const prompt = `Act as a senior market analyst. Analyze the following asset: ${starredSymbol}. 
-      Provide a deep analysis into the current market sentiment, confidence level, and detailed reasoning.
-      Also provide prediction market probabilities for bullish, neutral, and bearish scenarios.`;
+      const ai = new GoogleGenAI({ apiKey });
+      const prompt = `Act as a senior Quantitative Strategist at a Tier-1 bulge bracket bank. 
+      Analyze the current institutional market structure and sentiment for: ${starredSymbol}. 
+      
+      Provide a comprehensive focus report including:
+      1. Institutional Bias (Bullish/Bearish/Neutral)
+      2. Confidence Score based on current volume profile and HTF confluence.
+      3. Precise reasoning focusing on liquidity zones and structural shifts.
+      4. Prediction market probabilities for the next 24-48 hours.
+      5. Identify 3 critical key levels (Support/Resistance/OB/FVG) that algorithms are focusing on.
+
+      Respond ONLY in JSON format:
+      {
+        "sentiment": "bullish" | "bearish" | "neutral",
+        "confidence": number,
+        "reasoning": "string (short professional summary)",
+        "probabilities": { "bullish": number, "neutral": number, "bearish": number },
+        "key_levels": [
+           { "type": "string", "price": "string", "rationale": "string" }
+        ]
+      }`;
       
       const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
         contents: [{ parts: [{ text: prompt }] }],
         config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              sentiment: {
-                type: Type.STRING,
-                enum: ["bullish", "bearish", "neutral"],
-                description: "The overall market sentiment."
-              },
-              confidence: {
-                type: Type.NUMBER,
-                description: "Confidence score from 0 to 100."
-              },
-              reasoning: {
-                type: Type.STRING,
-                description: "Two to three sentences explaining the analysis."
-              },
-              probabilities: {
-                type: Type.OBJECT,
-                properties: {
-                  bullish: { type: Type.NUMBER },
-                  neutral: { type: Type.NUMBER },
-                  bearish: { type: Type.NUMBER }
-                },
-                required: ["bullish", "neutral", "bearish"]
-              }
-            },
-            required: ["sentiment", "confidence", "reasoning", "probabilities"]
-          }
+          responseMimeType: "application/json"
         }
       });
       
       const text = response.text || "";
-      setAnalysis(JSON.parse(text));
+      const cleanedText = text.replace(/```json|```/g, '').trim();
+      setAnalysis(JSON.parse(cleanedText));
     } catch (err: any) {
       console.error('AI Insights Error:', err);
       setError(err?.message || 'Failed to generate market insights. Ensure your connection and API key are valid.');
@@ -5525,7 +5532,34 @@ const AIInsights = ({ starredSymbol }: { starredSymbol: string | null }) => {
           </div>
         ) : (
           <div className="space-y-8">
-            {error && (
+            {error === 'API_KEY_MISSING' ? (
+              <div className="p-8 bg-indigo-500/5 border border-indigo-500/20 rounded-[2rem] text-center space-y-4">
+                <div className="w-16 h-16 rounded-full bg-indigo-500/10 flex items-center justify-center mx-auto">
+                  <Lock className="w-8 h-8 text-indigo-400" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black text-white uppercase tracking-tight mb-2">AI Access Required</h3>
+                  <p className="text-[10px] text-zinc-500 max-w-sm mx-auto font-medium uppercase tracking-widest leading-relaxed">
+                    To leverage ZYNC's Intelligence Focus, configure a Gemini API key. 
+                    This enables real-time market analysis and sentiment detection.
+                  </p>
+                </div>
+                <button 
+                  onClick={async () => {
+                    const aiStudio = (window as any).aistudio;
+                    if (aiStudio?.openSelectKey) {
+                      await aiStudio.openSelectKey();
+                      getInsights();
+                    } else {
+                      setError('Please configure GEMINI_API_KEY in your settings.');
+                    }
+                  }}
+                  className="px-8 py-3 bg-indigo-500 text-white rounded-xl text-[9px] font-black uppercase tracking-widest shadow-lg shadow-indigo-500/20 hover:scale-105 transition-all"
+                >
+                  Configure AI Credentials
+                </button>
+              </div>
+            ) : error ? (
               <div className="p-6 bg-rose-500/10 border border-rose-500/20 rounded-2xl flex flex-col items-center gap-3">
                 <AlertCircle className="w-8 h-8 text-rose-500" />
                 <p className="text-[10px] font-black text-rose-400 uppercase tracking-widest text-center">{error}</p>
@@ -5536,7 +5570,7 @@ const AIInsights = ({ starredSymbol }: { starredSymbol: string | null }) => {
                   Retry Analysis
                 </button>
               </div>
-            )}
+            ) : null}
 
             {!analysis && !loading && !error && (
               <button 
@@ -5576,6 +5610,21 @@ const AIInsights = ({ starredSymbol }: { starredSymbol: string | null }) => {
                             "{analysis.reasoning}"
                          </p>
                       </div>
+
+                      {analysis.key_levels && (
+                        <div className="grid grid-cols-3 gap-4">
+                          {analysis.key_levels.map((level, idx) => (
+                            <div key={idx} className="p-4 bg-black/40 border border-zinc-900 rounded-2xl">
+                               <div className="flex items-center justify-between mb-1.5">
+                                 <span className="text-[8px] font-black text-indigo-400 uppercase tracking-widest">{level.type}</span>
+                                 <TargetIcon className="w-3 h-3 text-zinc-700" />
+                               </div>
+                               <p className="text-lg font-black text-white tracking-tight leading-none mb-1">{level.price}</p>
+                               <p className="text-[8px] text-zinc-600 font-bold uppercase tracking-tight leading-tight">{level.rationale}</p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                    </div>
 
                    <div className="col-span-1 bg-black/40 p-8 rounded-3xl border border-zinc-900 flex flex-col justify-center">
@@ -5606,7 +5655,7 @@ const AIInsights = ({ starredSymbol }: { starredSymbol: string | null }) => {
                 <div className="flex items-center justify-between pt-6 border-t border-zinc-900">
                   <p className="text-[9px] text-zinc-600 font-black uppercase tracking-widest">Source: Gemini 3 High-Fidelity Focus</p>
                   <button 
-                    onClick={() => setAnalysis(null)}
+                    onClick={getInsights}
                     className="text-[10px] text-zinc-500 hover:text-white uppercase font-black tracking-widest transition-colors flex items-center gap-1.5 group"
                   >
                     <RotateCw className="w-3 h-3 group-hover:rotate-180 transition-transform duration-500" />
