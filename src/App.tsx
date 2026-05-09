@@ -521,6 +521,7 @@ const AuthPage = ({ onAuthComplete, theme, embedded = false }: AuthPageProps) =>
       </motion.div>
 
       <div className="fixed bottom-0 left-0 w-full z-50">
+        <SentimentBiasMarquee />
         <FuturesMarquee />
       </div>
     </div>
@@ -5203,6 +5204,51 @@ const FuturesMarquee = () => {
   );
 };
 
+const SentimentBiasMarquee = () => {
+  const sentiments = [
+    { pair: 'NAS100', bias: 'BULLISH', confidence: '82%', logic: 'Demand above 18500' },
+    { pair: 'US30', bias: 'BEARISH', confidence: '64%', logic: 'Rejecting Daily H1' },
+    { pair: 'SPX500', bias: 'BULLISH', confidence: '71%', logic: 'VWAP Support Hold' },
+    { pair: 'XAUUSD', bias: 'BULLISH', confidence: '89%', logic: 'Safe Haven Inflow' },
+    { pair: 'EURUSD', bias: 'BEARISH', confidence: '58%', logic: 'DXY Strength' },
+    { pair: 'DAX40', bias: 'NEUTRAL', confidence: '45%', logic: 'Range Bound' },
+  ];
+
+  return (
+    <div className="w-full bg-zinc-950/60 backdrop-blur-sm border-b border-white/5 py-3 overflow-hidden relative">
+      <motion.div 
+        animate={{ x: ["-50%", "0%"] }}
+        transition={{ 
+          duration: 35, 
+          repeat: Infinity, 
+          ease: "linear" 
+        }}
+        className="flex whitespace-nowrap"
+      >
+        {[...sentiments, ...sentiments].map((s, idx) => (
+          <div key={idx} className="inline-flex items-center gap-4 px-10 border-r border-white/5">
+            <div className="flex items-center gap-2">
+               <div className={cn(
+                  "w-2 h-2 rounded-full animate-pulse",
+                  s.bias === 'BULLISH' ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" : s.bias === 'BEARISH' ? "bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]" : "bg-zinc-500"
+               )} />
+               <span className="text-[10px] font-black text-white uppercase tracking-widest">{s.pair}</span>
+            </div>
+            <div className="flex items-center gap-3">
+               <span className={cn(
+                  "text-[9px] font-black px-2 py-0.5 rounded-md",
+                  s.bias === 'BULLISH' ? "bg-emerald-500/10 text-emerald-400" : s.bias === 'BEARISH' ? "bg-rose-500/10 text-rose-400" : "bg-zinc-500/10 text-zinc-400"
+               )}>{s.bias}</span>
+               <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-tighter">{s.confidence} CONF.</span>
+               <span className="text-[8px] font-medium text-zinc-600 uppercase italic opacity-50">{s.logic}</span>
+            </div>
+          </div>
+        ))}
+      </motion.div>
+    </div>
+  );
+};
+
 const MarketBannerSlider = () => {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [activeUsers, setActiveUsers] = useState<{name: string, pair: string, time: string}[]>([]);
@@ -5286,6 +5332,29 @@ const MarketBannerSlider = () => {
         <div className="flex items-center gap-2 px-4 py-2 bg-black/30 rounded-2xl border border-white/10">
           <Globe className="w-4 h-4 text-emerald-400" />
           <span className="text-[10px] font-black text-white uppercase tracking-widest">Global Coverage 24/7</span>
+        </div>
+      )
+    },
+    {
+      title: "INSTITUTIONAL BIAS",
+      description: "Get real-time market direction bias updated after 9:30 NYC OPEN. Analyzed via ZYNC Algo Pulsar monitoring institutional volume.",
+      accent: "from-emerald-600 to-indigo-600",
+      icon: <TrendingUp className="w-64 h-64 text-white" />,
+      badge: "NY Open Edge",
+      extra: (
+        <div className="flex items-center gap-6">
+          <div className="flex flex-col gap-1">
+            <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">NAS100 ALPHA</span>
+            <div className="h-1 w-32 bg-zinc-800 rounded-full overflow-hidden">
+               <motion.div initial={{ width: 0 }} animate={{ width: '82%' }} className="h-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]" />
+            </div>
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className="text-[10px] font-black text-rose-500 uppercase tracking-widest">US30 ALPHA</span>
+            <div className="h-1 w-32 bg-zinc-800 rounded-full overflow-hidden">
+               <motion.div initial={{ width: 0 }} animate={{ width: '64%' }} className="h-full bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.5)]" />
+            </div>
+          </div>
         </div>
       )
     }
@@ -6179,8 +6248,6 @@ const Markets = () => {
           </div>
         ))}
       </div>
-
-      <MarketBannerSlider />
 
       {/* Watchlist Section */}
       <div className="mb-24">
@@ -7227,6 +7294,10 @@ export default function App() {
           settings.theme === 'light' ? "bg-zinc-50" : "bg-[#0A0A0B]"
         )}>
           <div className="p-6 sm:p-10 max-w-[1800px] mx-auto w-full">
+            <div className="mb-10">
+              <MarketBannerSlider />
+              <SentimentBiasMarquee />
+            </div>
             <AnimatePresence mode="wait">
               <motion.div
                 key={activeTab}
