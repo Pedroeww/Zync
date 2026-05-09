@@ -5458,8 +5458,36 @@ const AIInsights = ({ starredSymbol }: { starredSymbol: string | null }) => {
 
 const EconomicCalendar = () => {
   const [activeWeekOffset, setActiveWeekOffset] = useState(0); // 0 = Current, 1 = Next
-  const [activeDate, setActiveDate] = useState(() => format(new Date(), 'yyyy-MM-dd'));
+  const [activeDate, setActiveDate] = useState<string | null>(null);
   const [timezone, setTimezone] = useState<'EST' | 'PHT'>('EST');
+  const [selectedEvent, setSelectedEvent] = useState<any>(null);
+  
+  const scrollToDate = (date: string) => {
+    setActiveDate(date);
+    const element = document.getElementById(`date-${date}`);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
+  const getMarketProbability = (event: string) => {
+    // Generate some interesting looking fake probabilities for the UI
+    const hash = event.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    const manipulation = (hash % 40) + 30; // 30-70%
+    const direction = (hash % 60) + 20; // 20-80%
+    const bias = hash % 2 === 0 ? 'Bullish' : 'Bearish';
+    
+    return {
+      manipulation,
+      direction,
+      bias,
+      afterNYOpen: {
+        bullish: (hash % 30) + 40,
+        bearish: (hash % 30) + 10,
+        neutral: 100 - ((hash % 30) + 40) - ((hash % 30) + 10)
+      }
+    };
+  };
   
   const economicEvents = useMemo(() => {
     // Shared events from BankForecast or similar
@@ -5575,7 +5603,7 @@ const EconomicCalendar = () => {
           {dates.map(date => (
              <button
                 key={date}
-                onClick={() => setActiveDate(date)}
+                onClick={() => scrollToDate(date)}
                 className={cn(
                    "px-6 py-4 md:px-10 md:py-6 rounded-[1.5rem] md:rounded-[2.5rem] border transition-all flex flex-col items-center gap-1 md:gap-2 group shrink-0",
                    activeDate === date 
@@ -5626,11 +5654,12 @@ const EconomicCalendar = () => {
                       {dayEvents.map((e, idx) => (
                          <motion.div
                             key={`${e.event}-${idx}`}
+                             onClick={() => setSelectedEvent(e)}
                             initial={{ opacity: 0, y: 10 }}
                             whileInView={{ opacity: 1, y: 0 }}
                             viewport={{ once: true }}
                             className={cn(
-                              "group grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-8 items-center px-6 md:px-10 py-6 md:py-8 bg-zinc-950/40 border transition-all hover:bg-zinc-900/20 rounded-[2rem] md:rounded-[2.5rem]",
+                              "group grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-8 items-center px-6 md:px-10 py-6 md:py-8 bg-zinc-950/40 border transition-all hover:bg-zinc-900/20 rounded-[2rem] md:rounded-[2.5rem] cursor-pointer active:scale-[0.98]",
                               activeDate === date ? "border-indigo-500/30" : "border-zinc-800/50 hover:border-zinc-700"
                             )}
                          >
@@ -5641,7 +5670,12 @@ const EconomicCalendar = () => {
                                    "text-[8px] font-black uppercase px-2 py-0.5 rounded-full",
                                    e.impact === 'high' ? "bg-rose-500/20 text-rose-500" : e.impact === 'medium' ? "bg-orange-500/20 text-orange-500" : "bg-emerald-500/20 text-emerald-500"
                                  )}>{e.impact}</span>
-                                 <span className="text-[10px] font-black text-zinc-500">{e.currency}</span>
+                                 <div className="flex items-center gap-1.5 p-1 bg-white/5 border border-white/10 rounded-full">
+                                   <div className="w-5 h-5 rounded-full overflow-hidden">
+                                     <img src={`https://raw.githubusercontent.com/manon-m/Forex-Icons/master/flags/${e.currency.toLowerCase()}.png`} alt={e.currency} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                   </div>
+                                   <span className="text-[10px] font-black text-white px-1">{e.currency}</span>
+                                 </div>
                                </div>
                             </div>
                             <div className="col-span-1 hidden md:flex items-center gap-3">
@@ -5686,7 +5720,154 @@ const EconomicCalendar = () => {
           })}
        </div>
        
-       <div className="mt-12 md:mt-20 p-8 md:p-10 bg-indigo-500/5 border border-indigo-500/10 rounded-[2rem] md:rounded-[3rem] relative overflow-hidden group">
+               <AnimatePresence>
+          {selectedEvent && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl"
+              onClick={() => setSelectedEvent(null)}
+            >
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                className="w-full max-w-2xl bg-zinc-950 border border-zinc-800 rounded-[3rem] p-8 md:p-12 shadow-2xl relative overflow-hidden"
+                onClick={e => e.stopPropagation()}
+              >
+                {/* Background Glow */}
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1/2 h-1/2 bg-indigo-500/10 blur-[120px] pointer-events-none" />
+                <div className="absolute bottom-0 right-0 w-1/4 h-1/4 bg-emerald-500/5 blur-[80px] pointer-events-none" />
+
+                <div className="relative">
+                  <div className="flex items-center justify-between mb-10">
+                     <div className="flex items-center gap-4">
+                        <div className={cn(
+                           "w-12 h-6 md:w-16 md:h-8 rounded-full flex items-center justify-center text-[10px] font-black uppercase tracking-widest",
+                           selectedEvent.impact === 'high' ? "bg-rose-500 text-black" : selectedEvent.impact === 'medium' ? "bg-orange-500 text-black" : "bg-emerald-500 text-black"
+                        )}>
+                           {selectedEvent.impact}
+                        </div>
+                        <div className="flex items-center gap-2">
+                           <div className="w-8 h-8 rounded-full overflow-hidden border border-white/10">
+                              <img src={`https://raw.githubusercontent.com/manon-m/Forex-Icons/master/flags/${selectedEvent.currency.toLowerCase()}.png`} alt={selectedEvent.currency} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                           </div>
+                           <span className="text-xl font-black text-white">{selectedEvent.currency}</span>
+                        </div>
+                     </div>
+                     <button 
+                        onClick={() => setSelectedEvent(null)}
+                        className="w-12 h-12 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center border border-white/10 group active:scale-95 transition-all text-white"
+                     >
+                        <X className="w-5 h-5 group-hover:rotate-90 transition-transform" />
+                     </button>
+                  </div>
+
+                  <div className="mb-12">
+                     <p className="text-indigo-400 text-[10px] font-black uppercase tracking-[0.4em] mb-3">Institutional News Release</p>
+                     <h2 className="text-3xl md:text-5xl font-black text-white uppercase tracking-tight leading-none mb-6">{selectedEvent.event}</h2>
+                     <p className="text-zinc-400 text-sm md:text-base leading-relaxed font-medium uppercase tracking-tight opacity-80">{selectedEvent.desc}</p>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-4 mb-12">
+                     {[
+                        { label: 'Actual', value: selectedEvent.actual, color: 'text-white' },
+                        { label: 'Forecast', value: selectedEvent.forecast, color: 'text-white/60' },
+                        { label: 'Previous', value: selectedEvent.previous, color: 'text-zinc-500' }
+                     ].map(item => (
+                        <div key={item.label} className="p-6 bg-white/[0.02] border border-white/5 rounded-3xl">
+                           <p className="text-[9px] font-black text-zinc-500 uppercase tracking-widest mb-2">{item.label}</p>
+                           <p className={cn("text-xl md:text-2xl font-black", item.color)}>{item.value}</p>
+                        </div>
+                     ))}
+                  </div>
+
+                  <div className="p-8 bg-zinc-900/40 border border-zinc-800 rounded-[2.5rem]">
+                     <div className="flex items-center gap-3 mb-8">
+                        <Zap className="w-4 h-4 text-emerald-500" />
+                        <h3 className="text-[10px] font-black text-white uppercase tracking-[0.3em]">Institutional Probability Index</h3>
+                     </div>
+
+                     <div className="space-y-8">
+                        {(() => {
+                           const prob = getMarketProbability(selectedEvent.event);
+                           return (
+                              <>
+                                 <div className="grid grid-cols-2 gap-8">
+                                    <div className="space-y-4">
+                                       <div className="flex justify-between items-end">
+                                          <p className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">Market Manipulation</p>
+                                          <p className="text-xl font-black text-white">{prob.manipulation}%</p>
+                                       </div>
+                                       <div className="h-2 w-full bg-zinc-900 rounded-full overflow-hidden">
+                                          <motion.div 
+                                             initial={{ width: 0 }}
+                                             animate={{ width: `${prob.manipulation}%` }}
+                                             transition={{ duration: 1, ease: "easeOut" }}
+                                             className="h-full bg-gradient-to-r from-orange-500 to-rose-500 shadow-[0_0_15px_rgba(244,63,94,0.3)]"
+                                          />
+                                       </div>
+                                    </div>
+                                    <div className="space-y-4">
+                                       <div className="flex justify-between items-end">
+                                          <p className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">Overall Direction</p>
+                                          <p className="text-xl font-black text-white">{prob.direction}%</p>
+                                       </div>
+                                       <div className="h-2 w-full bg-zinc-900 rounded-full overflow-hidden">
+                                          <motion.div 
+                                             initial={{ width: 0 }}
+                                             animate={{ width: `${prob.direction}%` }}
+                                             transition={{ duration: 1, ease: "easeOut", delay: 0.2 }}
+                                             className="h-full bg-gradient-to-r from-indigo-500 to-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.3)]"
+                                          />
+                                       </div>
+                                    </div>
+                                 </div>
+
+                                 <div className="p-6 bg-white/[0.03] border border-white/5 rounded-3xl">
+                                    <div className="flex items-center justify-between mb-6">
+                                       <p className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">Post-NY Open Sentiment (EST 09:30+)</p>
+                                       <div className={cn(
+                                          "px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest",
+                                          prob.bias === 'Bullish' ? "bg-emerald-500/20 text-emerald-500" : "bg-rose-500/20 text-rose-500"
+                                       )}>
+                                          {prob.bias} Edge
+                                       </div>
+                                    </div>
+                                    <div className="flex h-4 w-full rounded-xl overflow-hidden bg-zinc-900 border border-zinc-950">
+                                       <motion.div 
+                                          initial={{ flex: 0 }} animate={{ flex: prob.afterNYOpen.bullish/100 }}
+                                          className="bg-emerald-500 flex items-center justify-center text-[7px] font-black text-black"
+                                       >
+                                          {prob.afterNYOpen.bullish}% BULL
+                                       </motion.div>
+                                       <motion.div 
+                                          initial={{ flex: 0 }} animate={{ flex: prob.afterNYOpen.neutral/100 }}
+                                          className="bg-zinc-700 flex items-center justify-center text-[7px] font-black text-white"
+                                       >
+                                          {prob.afterNYOpen.neutral}% NEUT
+                                       </motion.div>
+                                       <motion.div 
+                                          initial={{ flex: 0 }} animate={{ flex: prob.afterNYOpen.bearish/100 }}
+                                          className="bg-rose-500 flex items-center justify-center text-[7px] font-black text-black"
+                                       >
+                                          {prob.afterNYOpen.bearish}% BEAR
+                                       </motion.div>
+                                    </div>
+                                 </div>
+                              </>
+                           );
+                        })()}
+                     </div>
+                  </div>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <div className="mt-12 md:mt-20 p-8 md:p-10 bg-indigo-500/5 border border-indigo-500/10 rounded-[2rem] md:rounded-[3rem] relative overflow-hidden group">
           <div className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none group-hover:scale-110 transition-transform duration-1000">
              <Info className="w-32 h-32 md:w-64 md:h-64 text-indigo-500" />
           </div>
