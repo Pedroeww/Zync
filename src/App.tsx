@@ -3480,7 +3480,7 @@ const Settings = ({
   };
 
   return (
-    <div className="max-w-2xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="w-full space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* Cloud Sync & Security Section */}
       <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-xl shadow-xl relative overflow-hidden flex flex-col items-center text-center">
         <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-indigo-500/5 blur-[80px] rounded-full" />
@@ -3956,7 +3956,7 @@ const Plan = ({
   }, [settings.playbook, settings.activePlaybookId]);
 
   return (
-    <ScrollAnimatedSection className="max-w-5xl mx-auto py-4">
+    <ScrollAnimatedSection className="w-full py-4">
       {/* Header Section */}
       <div className="relative overflow-hidden bg-zinc-900 border border-zinc-800 rounded-3xl p-8 mb-8">
         <div className="absolute top-0 right-0 -mr-20 -mt-20 w-80 h-80 bg-emerald-500/5 blur-[120px] rounded-full" />
@@ -5171,30 +5171,30 @@ const FuturesMarquee = () => {
   ];
 
   return (
-    <div className="w-full bg-black/40 backdrop-blur-xl border-y border-white/5 py-4 overflow-hidden relative group">
-      <div className="absolute inset-y-0 left-0 w-20 bg-gradient-to-r from-black to-transparent z-10" />
-      <div className="absolute inset-y-0 right-0 w-20 bg-gradient-to-l from-black to-transparent z-10" />
+    <div className="w-full bg-white/[0.01] backdrop-blur-2xl border-y border-white/[0.05] py-3 overflow-hidden relative group">
+      <div className="absolute inset-y-0 left-0 w-24 bg-gradient-to-r from-zinc-950 to-transparent z-10 opacity-50" />
+      <div className="absolute inset-y-0 right-0 w-24 bg-gradient-to-l from-zinc-950 to-transparent z-10 opacity-50" />
       
       <motion.div 
         animate={{ x: ["0%", "-50%"] }}
         transition={{ 
-          duration: 30, 
+          duration: 40, 
           repeat: Infinity, 
           ease: "linear" 
         }}
         className="flex whitespace-nowrap"
       >
         {[...assets, ...assets].map((asset, idx) => (
-          <div key={idx} className="inline-flex items-center gap-6 px-12 border-r border-white/5 h-10">
+          <div key={idx} className="inline-flex items-center gap-6 px-12 border-r border-white/[0.05] h-8">
             <div className="flex flex-col">
-              <span className="text-[9px] font-black text-zinc-500 tracking-[0.2em] uppercase leading-none mb-1">{asset.name}</span>
-              <span className="text-sm font-black text-white tracking-tighter leading-none">{asset.symbol}</span>
+              <span className="text-[8px] font-black text-zinc-600 tracking-[0.2em] uppercase leading-none mb-1">{asset.name}</span>
+              <span className="text-xs font-black text-white/90 tracking-tighter leading-none">{asset.symbol}</span>
             </div>
             <div className="flex flex-col items-end">
-              <span className="text-sm font-black text-white tracking-tighter leading-none mb-1">{asset.price}</span>
+              <span className="text-xs font-black text-white/90 tracking-tighter leading-none mb-1">{asset.price}</span>
               <span className={cn(
-                "text-[9px] font-black uppercase tracking-widest leading-none",
-                asset.change.startsWith('+') ? "text-emerald-500" : "text-rose-500"
+                "text-[8px] font-black uppercase tracking-widest leading-none",
+                asset.change.startsWith('+') ? "text-emerald-500/80" : "text-rose-500/80"
               )}>{asset.change}</span>
             </div>
           </div>
@@ -5215,7 +5215,7 @@ const SentimentBiasMarquee = () => {
   ];
 
   return (
-    <div className="w-full bg-zinc-950/60 backdrop-blur-sm border-b border-white/5 py-3 overflow-hidden relative">
+    <div className="w-full bg-white/[0.02] backdrop-blur-xl border-b border-white/5 py-4 overflow-hidden relative">
       <motion.div 
         animate={{ x: ["-50%", "0%"] }}
         transition={{ 
@@ -5226,21 +5226,21 @@ const SentimentBiasMarquee = () => {
         className="flex whitespace-nowrap"
       >
         {[...sentiments, ...sentiments].map((s, idx) => (
-          <div key={idx} className="inline-flex items-center gap-4 px-10 border-r border-white/5">
+          <div key={idx} className="inline-flex items-center gap-6 px-12 border-r border-white/10">
             <div className="flex items-center gap-2">
                <div className={cn(
-                  "w-2 h-2 rounded-full animate-pulse",
+                  "w-1.5 h-1.5 rounded-full animate-pulse",
                   s.bias === 'BULLISH' ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" : s.bias === 'BEARISH' ? "bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]" : "bg-zinc-500"
                )} />
-               <span className="text-[10px] font-black text-white uppercase tracking-widest">{s.pair}</span>
+               <span className="text-[9px] font-black text-white/90 uppercase tracking-widest">{s.pair}</span>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-4">
                <span className={cn(
-                  "text-[9px] font-black px-2 py-0.5 rounded-md",
-                  s.bias === 'BULLISH' ? "bg-emerald-500/10 text-emerald-400" : s.bias === 'BEARISH' ? "bg-rose-500/10 text-rose-400" : "bg-zinc-500/10 text-zinc-400"
+                  "text-[8px] font-black px-2 py-0.5 rounded",
+                  s.bias === 'BULLISH' ? "text-emerald-400" : s.bias === 'BEARISH' ? "text-rose-400" : "text-zinc-400"
                )}>{s.bias}</span>
-               <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-tighter">{s.confidence} CONF.</span>
-               <span className="text-[8px] font-medium text-zinc-600 uppercase italic opacity-50">{s.logic}</span>
+               <span className="text-[8px] font-bold text-zinc-500 uppercase tracking-widest">{s.confidence}</span>
+               <span className="text-[7px] font-medium text-zinc-600 uppercase tracking-tighter opacity-40">{s.logic}</span>
             </div>
           </div>
         ))}
@@ -5368,46 +5368,58 @@ const MarketBannerSlider = () => {
   }, []);
 
   return (
-    <div className="mt-12 mb-12 relative h-[380px]">
+    <div className="mt-8 mb-8 relative h-[280px] sm:h-[240px] md:h-[180px]">
       <AnimatePresence mode="wait">
         <motion.div 
           key={currentSlide}
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -20 }}
-          transition={{ duration: 0.6, ease: "circOut" }}
-          className={cn(
-            "absolute inset-0 overflow-hidden rounded-[2.5rem] bg-gradient-to-br p-10 group flex flex-col justify-center",
-            slides[currentSlide].accent
-          )}
+          initial={{ opacity: 0, scale: 0.98 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 1.02 }}
+          transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+          className="absolute inset-0 overflow-hidden rounded-[1.5rem] md:rounded-[2rem] bg-white/[0.02] backdrop-blur-2xl border border-white/[0.05] p-5 sm:p-8 md:p-10 group flex flex-col justify-center"
         >
-          <div className="absolute inset-0 bg-black/20 backdrop-blur-[2px]" />
-          <div className="absolute top-0 right-0 p-10 opacity-20 transform translate-x-1/4 -translate-y-1/4 group-hover:scale-110 transition-transform duration-700">
+          {/* Subtle Accent Glow */}
+          <div className={cn(
+            "absolute -right-20 -top-20 w-80 h-80 blur-[120px] opacity-20 bg-gradient-to-br transition-all duration-1000",
+            slides[currentSlide].accent
+          )} />
+          
+          <div className="absolute top-0 right-0 p-4 sm:p-8 opacity-10 transform translate-x-1/4 -translate-y-1/4 group-hover:scale-105 transition-transform duration-1000 pointer-events-none">
             {slides[currentSlide].icon}
           </div>
           
-          <div className="relative z-10 max-w-2xl">
-            <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 backdrop-blur-md rounded-full border border-white/20 mb-6">
-              <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-              <span className="text-[10px] font-black text-white uppercase tracking-widest">{slides[currentSlide].badge}</span>
+          <div className="relative z-10 w-full flex flex-col md:flex-row items-start md:items-center justify-between gap-4 sm:gap-6 md:gap-12">
+            <div className="flex flex-col shrink-0">
+              <div className="inline-flex items-center gap-2 px-2.5 py-1 bg-white/5 backdrop-blur-md rounded-full border border-white/10 mb-3 w-fit">
+                <div className="w-1 h-1 rounded-full bg-indigo-400 animate-pulse" />
+                <span className="text-[8px] md:text-[9px] font-black text-zinc-400 uppercase tracking-[0.2em]">{slides[currentSlide].badge}</span>
+              </div>
+              <h2 className="text-xl sm:text-2xl md:text-3xl font-black text-white tracking-tighter leading-none uppercase">
+                {slides[currentSlide].title}
+              </h2>
             </div>
-            <h2 className="text-4xl font-black text-white tracking-tighter mb-4 leading-[0.9] uppercase">
-              {slides[currentSlide].title}
-            </h2>
-            <p className="text-white/80 text-sm font-medium leading-relaxed mb-8 max-w-xl">
-              {slides[currentSlide].description}
-            </p>
-            {slides[currentSlide].extra}
+
+            <div className="flex-1 max-w-md hidden sm:block">
+              <p className="text-zinc-400 text-[9px] md:text-[10px] font-medium leading-relaxed uppercase tracking-widest opacity-60 line-clamp-2 md:line-clamp-none">
+                {slides[currentSlide].description}
+              </p>
+            </div>
+            
+            <div className="shrink-0 flex items-center w-full md:w-auto overflow-x-auto no-scrollbar py-1">
+              <div className="flex items-center gap-4 md:gap-8 w-full justify-between md:justify-end">
+                {slides[currentSlide].extra}
+              </div>
+            </div>
           </div>
 
-          <div className="absolute bottom-10 right-10 flex gap-2 z-20">
+          <div className="absolute bottom-4 sm:bottom-6 right-6 sm:right-10 flex gap-1.5 z-20">
             {slides.map((_, idx) => (
               <button
                 key={idx}
                 onClick={() => setCurrentSlide(idx)}
                 className={cn(
-                  "h-1 rounded-full transition-all duration-300",
-                  currentSlide === idx ? "w-8 bg-white" : "w-2 bg-white/30"
+                  "h-1 rounded-full transition-all duration-500",
+                  currentSlide === idx ? "w-6 bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.5)]" : "w-1.5 bg-white/10 hover:bg-white/20"
                 )}
               />
             ))}
@@ -5692,7 +5704,7 @@ const EconomicCalendar = () => {
   }, [dates]);
 
   return (
-    <div className="max-w-7xl mx-auto p-4 md:p-8 pb-32">
+    <div className="p-4 md:p-8 pb-32 w-full">
        <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-12 md:mb-16">
           <div className="flex items-center gap-4 md:gap-6">
              <div className="w-12 h-12 md:w-16 md:h-16 rounded-2xl md:rounded-3xl bg-indigo-500/10 flex items-center justify-center border border-indigo-500/20 shadow-2xl shadow-indigo-500/10">
@@ -6116,7 +6128,7 @@ const Markets = () => {
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="p-8 max-w-7xl mx-auto pb-32"
+      className="p-8 w-full pb-32"
     >
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
         <div>
@@ -7293,10 +7305,9 @@ export default function App() {
           "flex-1 overflow-y-auto scroll-smooth transition-colors duration-500",
           settings.theme === 'light' ? "bg-zinc-50" : "bg-[#0A0A0B]"
         )}>
-          <div className="p-6 sm:p-10 max-w-[1800px] mx-auto w-full">
+          <div className="p-6 sm:p-10 w-full">
             <div className="mb-10">
               <MarketBannerSlider />
-              <SentimentBiasMarquee />
             </div>
             <AnimatePresence mode="wait">
               <motion.div
