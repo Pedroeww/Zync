@@ -55,7 +55,8 @@ import {
   LayoutGrid,
   Bell,
   RotateCw,
-  ShieldCheck
+  ShieldCheck,
+  Activity
 } from 'lucide-react';
 
 const NewFeatureNotification = () => {
@@ -4535,8 +4536,12 @@ const AINewsAnalysis = ({ news, includeFutures = true }: { news: any[], includeF
   }, [news]);
 
   return (
-    <div className="bg-zinc-950 border border-zinc-800 rounded-3xl p-8 backdrop-blur-xl group hover:border-emerald-500/20 transition-all shadow-xl">
-      <div className="flex items-center justify-between mb-8">
+    <div className="bg-zinc-950 border border-zinc-800 rounded-3xl p-8 backdrop-blur-xl group hover:border-emerald-500/20 transition-all shadow-xl relative overflow-hidden">
+      {/* Decorative Liquidity Pattern */}
+      <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/5 blur-[100px] rounded-full -mr-32 -mt-32 pointer-events-none" />
+      <div className="absolute bottom-0 left-0 w-64 h-64 bg-indigo-500/5 blur-[100px] rounded-full -ml-32 -mb-32 pointer-events-none" />
+
+      <div className="flex items-center justify-between mb-8 relative z-10">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-2xl bg-white/5 flex items-center justify-center border border-white/10">
             <ZapIcon className="w-5 h-5 text-emerald-500" />
@@ -4564,8 +4569,8 @@ const AINewsAnalysis = ({ news, includeFutures = true }: { news: any[], includeF
         )}
       </div>
 
-      {analysis && (
-        <div className="space-y-8">
+      {analysis ? (
+        <div className="space-y-8 relative z-10">
           {/* Prediction Market Visual */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
@@ -4652,6 +4657,16 @@ const AINewsAnalysis = ({ news, includeFutures = true }: { news: any[], includeF
             </div>
           </div>
         </div>
+      ) : !loading && (
+        <div className="py-12 flex flex-col items-center justify-center text-center space-y-4 relative z-10">
+          <div className="w-16 h-16 rounded-3xl bg-zinc-900 border border-zinc-800 flex items-center justify-center">
+            <CalendarIcon className="w-8 h-8 text-zinc-700" />
+          </div>
+          <div>
+            <h5 className="text-sm font-black text-white uppercase tracking-tight mb-1">No Market Events</h5>
+            <p className="text-[10px] text-zinc-600 font-medium max-w-[200px] uppercase tracking-widest leading-relaxed">Select a weekday to analyze institutional high-impact news flows.</p>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -4664,13 +4679,10 @@ const BankForecast = () => {
   
   const convertTime = (timeEST: string, targetTz: 'EST' | 'PHT') => {
     if (targetTz === 'EST') return timeEST;
-    // Assuming EST to PHT is +12 or +13. In May 2026 it's +12.
     const [time, period] = timeEST.split(' ');
     let [hours, minutes] = time.split(':').map(Number);
     if (period === 'PM' && hours !== 12) hours += 12;
     if (period === 'AM' && hours === 12) hours = 0;
-    
-    // Add 12 hours
     const phtHours = (hours + 12) % 24;
     const phtPeriod = phtHours >= 12 ? 'PM' : 'AM';
     const displayHours = phtHours % 12 || 12;
@@ -4681,204 +4693,79 @@ const BankForecast = () => {
     {
       day: 'Monday',
       events: [
-        { 
-          id: 101, 
-          time: '08:30 AM', 
-          currency: 'USD', 
-          event: 'Empire State Mfg Index', 
-          impact: 'low', 
-          volatility: 'Minor Effect',
-          duration: '4-6 Hours',
-          status: 'Upcoming',
-          keyPoint: 'Manufacturing health proxy',
-          forecast: '-14.0', 
-          previous: '-20.9', 
-          desc: "Survey of business conditions in NY." 
-        },
-        { 
-          id: 102, 
-          time: '11:30 AM', 
-          currency: 'USD', 
-          event: '3-Month Bill Auction', 
-          impact: 'low', 
-          volatility: 'Minor Effect',
-          duration: '1-2 Hours',
-          status: 'Upcoming',
-          keyPoint: 'Short-term yield tracking',
-          forecast: '5.24%', 
-          previous: '5.25%', 
-          desc: "Government debt auction results." 
-        }
+        { id: 101, time: '08:30 AM', currency: 'USD', event: 'Empire State Mfg Index', impact: 'low', volatility: 'Minor Effect', duration: '4-6 Hours', status: 'Upcoming', keyPoint: 'Manufacturing health proxy', forecast: '-14.0', previous: '-20.9', desc: "Survey of business conditions in NY." },
+        { id: 102, time: '11:30 AM', currency: 'USD', event: '3-Month Bill Auction', impact: 'low', volatility: 'Minor Effect', duration: '1-2 Hours', status: 'Upcoming', keyPoint: 'Short-term yield tracking', forecast: '5.24%', previous: '5.25%', desc: "Government debt auction results." }
       ]
     },
     {
       day: 'Tuesday',
       events: [
-        { 
-          id: 201, 
-          time: '08:30 AM', 
-          currency: 'USD', 
-          event: 'CPI m/m', 
-          impact: 'high', 
-          volatility: 'Major Effect',
-          duration: 'Full Day',
-          status: 'Upcoming',
-          keyPoint: 'Core inflation pressure',
-          forecast: '0.3%', 
-          previous: '0.4%', 
-          desc: "Primary indicator of consumer inflation." 
-        },
-        { 
-          id: 202, 
-          time: '08:30 AM', 
-          currency: 'CAD', 
-          event: 'CPI m/m', 
-          impact: 'high', 
-          volatility: 'Major Effect',
-          duration: '8-12 Hours',
-          status: 'Upcoming',
-          keyPoint: 'BoC policy driver',
-          forecast: '0.2%', 
-          previous: '0.1%', 
-          desc: "Core inflation tracking for CAD." 
-        }
+        { id: 201, time: '08:30 AM', currency: 'USD', event: 'CPI m/m', impact: 'high', volatility: 'Major Effect', duration: 'Full Day', status: 'Upcoming', keyPoint: 'Core inflation pressure', forecast: '0.3%', previous: '0.4%', desc: "Primary indicator of consumer inflation." },
+        { id: 202, time: '08:30 AM', currency: 'CAD', event: 'CPI m/m', impact: 'high', volatility: 'Major Effect', duration: '8-12 Hours', status: 'Upcoming', keyPoint: 'BoC policy driver', forecast: '0.2%', previous: '0.1%', desc: "Core inflation tracking for CAD." }
       ]
     },
     {
       day: 'Wednesday',
       events: [
-        { 
-          id: 301, 
-          time: '08:30 AM', 
-          currency: 'USD', 
-          event: 'Retail Sales m/m', 
-          impact: 'high', 
-          volatility: 'Major Effect',
-          duration: '6-8 Hours',
-          status: 'Upcoming',
-          keyPoint: 'Consumer demand health',
-          forecast: '0.4%', 
-          previous: '0.6%', 
-          desc: "Measure of consumer spending." 
-        },
-        { 
-          id: 302, 
-          time: '10:30 AM', 
-          currency: 'USD', 
-          event: 'Crude Oil Inventories', 
-          impact: 'medium', 
-          volatility: 'Moderate Effect',
-          duration: '4 Hours',
-          status: 'Upcoming',
-          keyPoint: 'Energy supply shift',
-          forecast: '1.2M', 
-          previous: '-1.5M', 
-          desc: "Weekly supply of commercial oil." 
-        }
+        { id: 301, time: '08:30 AM', currency: 'USD', event: 'Retail Sales m/m', impact: 'high', volatility: 'Major Effect', duration: '6-8 Hours', status: 'Upcoming', keyPoint: 'Consumer demand health', forecast: '0.4%', previous: '0.6%', desc: "Measure of consumer spending." },
+        { id: 302, time: '10:30 AM', currency: 'USD', event: 'Crude Oil Inventories', impact: 'medium', volatility: 'Moderate Effect', duration: '4 Hours', status: 'Upcoming', keyPoint: 'Energy supply shift', forecast: '1.2M', previous: '-1.5M', desc: "Weekly supply of commercial oil." }
       ]
     },
     {
       day: 'Thursday',
       events: [
-        { 
-          id: 401, 
-          time: '08:30 AM', 
-          currency: 'USD', 
-          event: 'Philly Fed Mfg Index', 
-          impact: 'medium', 
-          volatility: 'Moderate Effect',
-          duration: '4-6 Hours',
-          status: 'Upcoming',
-          keyPoint: 'Regional business trends',
-          forecast: '1.5', 
-          previous: '4.2', 
-          desc: "Manufacturing conditions in Philadelphia." 
-        },
-        { 
-          id: 402, 
-          time: '08:30 AM', 
-          currency: 'USD', 
-          event: 'Unemployment Claims', 
-          impact: 'high', 
-          volatility: 'Major Effect',
-          duration: '6-10 Hours',
-          status: 'Upcoming',
-          keyPoint: 'Labor market tightness',
-          forecast: '215K', 
-          previous: '210K', 
-          desc: "Weekly first-time job seekers." 
-        }
+        { id: 401, time: '08:30 AM', currency: 'USD', event: 'Philly Fed Mfg Index', impact: 'medium', volatility: 'Moderate Effect', duration: '4-6 Hours', status: 'Upcoming', keyPoint: 'Regional business trends', forecast: '1.5', previous: '4.2', desc: "Manufacturing conditions in Philadelphia." },
+        { id: 402, time: '08:30 AM', currency: 'USD', event: 'Unemployment Claims', impact: 'high', volatility: 'Major Effect', duration: '6-10 Hours', status: 'Upcoming', keyPoint: 'Labor market tightness', forecast: '215K', previous: '210K', desc: "Weekly first-time job seekers." }
       ]
     },
     {
       day: 'Friday',
       events: [
-        { 
-          id: 501, 
-          time: '10:00 AM', 
-          currency: 'USD', 
-          event: 'Consumer Sentiment', 
-          impact: 'medium', 
-          volatility: 'Moderate Effect',
-          duration: '4 Hours',
-          status: 'Upcoming',
-          keyPoint: 'Future spending outlook',
-          forecast: '78.5', 
-          previous: '79.4', 
-          desc: "Confidence in overall economic health." 
-        },
-        { 
-          id: 502, 
-          time: '12:00 PM', 
-          currency: 'EUR', 
-          event: 'ECB President Lagarde Speaks', 
-          impact: 'high', 
-          volatility: 'Major Effect',
-          duration: 'Variable',
-          status: 'Upcoming',
-          keyPoint: 'Monetary policy clues',
-          forecast: '-', 
-          previous: '-', 
-          desc: "Critical clues for EUR monetary policy." 
-        }
+        { id: 501, time: '10:00 AM', currency: 'USD', event: 'Consumer Sentiment', impact: 'medium', volatility: 'Moderate Effect', duration: '4 Hours', status: 'Upcoming', keyPoint: 'Future spending outlook', forecast: '78.5', previous: '79.4', desc: "Confidence in overall economic health." },
+        { id: 502, time: '12:00 PM', currency: 'EUR', event: 'ECB President Lagarde Speaks', impact: 'high', volatility: 'Major Effect', duration: 'Variable', status: 'Upcoming', keyPoint: 'Monetary policy clues', forecast: '-', previous: '-', desc: "Critical clues for EUR monetary policy." }
+      ]
+    },
+    {
+      day: 'Saturday',
+      events: [
+        { id: 601, time: '09:00 AM', currency: 'ALL', event: 'Weekly COT Reporting', impact: 'medium', volatility: 'Institutional Insight', duration: 'Weekend', status: 'In Focus', keyPoint: 'Commercial positioning', forecast: '72% Long', previous: '68% Long', desc: "Commitment of Traders report analyzed for institutional directional bias." }
+      ]
+    },
+    {
+      day: 'Sunday',
+      events: [
+        { id: 701, time: '05:00 PM', currency: 'ALL', event: 'LSE/Asian Open Prep', impact: 'high', volatility: 'Gap Risk', duration: '4 Hours', status: 'Upcoming', keyPoint: 'Sunday Gap analysis', forecast: 'Neutral', previous: '-', desc: "Monitoring for weekend news gaps and institutional liquidity sweeps at open." }
       ]
     }
   ], []);
 
-    const currentNews = useMemo(() => {
+  const currentNews = useMemo(() => {
     const rawNews = weeklyNews.find(w => w.day === activeDay)?.events || [];
     const now = new Date();
-    const currentDay = format(now, 'EEEE');
-    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
-    const currentDayIdx = days.indexOf(currentDay);
-    const activeDayIdx = days.indexOf(activeDay);
+    const currentDayIdx = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].indexOf(format(now, 'EEEE'));
+    const activeDayIdx = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].indexOf(activeDay);
 
     return rawNews.map(news => {
       let status = 'Upcoming';
-      if (activeDayIdx < currentDayIdx) {
-        status = 'Released';
-      } else if (activeDayIdx === currentDayIdx) {
+      if (activeDayIdx < currentDayIdx) status = 'Released';
+      else if (activeDayIdx === currentDayIdx) {
         const [h, m_ap] = news.time.split(':');
         const [m, ap] = m_ap.split(' ');
         let eventHour = parseInt(h);
         if (ap === 'PM' && eventHour !== 12) eventHour += 12;
         if (ap === 'AM' && eventHour === 12) eventHour = 0;
-        const eventMinute = parseInt(m);
-        
         const eventTime = new Date();
-        eventTime.setHours(eventHour, eventMinute, 0, 0);
-        
+        eventTime.setHours(eventHour, parseInt(m), 0, 0);
         const diffInMinutes = (now.getTime() - eventTime.getTime()) / (1000 * 60);
-        
         if (diffInMinutes > 60) status = 'Released';
         else if (diffInMinutes >= 0) status = 'In Focus';
-        else status = 'Upcoming';
       }
       return { ...news, status };
     });
   }, [activeDay, weeklyNews]);
 
   const getCurrencyLogo = (curr: string) => {
+    if (curr === 'ALL') return 'https://static.vecteezy.com/system/resources/previews/016/017/018/original/transparent-world-globe-icon-free-png.png';
     const logos: Record<string, string> = {
       'USD': 'https://flagpedia.net/data/flags/w580/us.png',
       'EUR': 'https://flagpedia.net/data/flags/w580/eu.png',
@@ -4902,77 +4789,39 @@ const BankForecast = () => {
             <div>
               <div className="flex items-center gap-3 mb-1">
                 <h3 className="text-2xl font-black text-white tracking-tighter uppercase italic">Institutional Bank Forecast</h3>
-                <div className="px-2 py-0.5 bg-indigo-500/10 text-indigo-400 rounded text-[8px] font-black uppercase tracking-widest border border-indigo-500/20">Weekly View</div>
+                <div className="flex items-center gap-2 px-2 py-0.5 bg-indigo-500/10 text-indigo-400 rounded border border-indigo-500/20">
+                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-ping" />
+                  <span className="text-[8px] font-black uppercase tracking-widest">Live Institutional Feed Active</span>
+                </div>
               </div>
-              <p className="text-[10px] text-zinc-500 font-black uppercase tracking-[0.2em]">Monitoring May 04 — May 10, 2026</p>
+              <p className="text-[10px] text-zinc-500 font-black uppercase tracking-[0.2em]">Monitoring May 04 &mdash; May 10, 2026</p>
             </div>
+            
+            <div className="flex flex-col sm:flex-row gap-2">
+              <div className="flex bg-black/40 p-1 rounded-2xl border border-white/5 backdrop-blur-md overflow-x-auto no-scrollbar w-full md:w-auto">
+                <button onClick={() => setTimezone('EST')} className={cn("px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all shrink-0", timezone === 'EST' ? "bg-indigo-500 text-white" : "text-zinc-500 hover:text-zinc-300")}>EST</button>
+                <button onClick={() => setTimezone('PHT')} className={cn("px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all shrink-0", timezone === 'PHT' ? "bg-indigo-500 text-white" : "text-zinc-500 hover:text-zinc-300")}>PHT</button>
+              </div>
             
               <div className="flex bg-black/40 p-1 rounded-2xl border border-white/5 backdrop-blur-md overflow-x-auto no-scrollbar w-full md:w-auto">
-                <button 
-                  onClick={() => setTimezone('EST')}
-                  className={cn(
-                    "px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all shrink-0",
-                    timezone === 'EST' ? "bg-indigo-500 text-white" : "text-zinc-500 hover:text-zinc-300"
-                  )}
-                >
-                  EST
-                </button>
-                <button 
-                  onClick={() => setTimezone('PHT')}
-                  className={cn(
-                    "px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all shrink-0",
-                    timezone === 'PHT' ? "bg-indigo-500 text-white" : "text-zinc-500 hover:text-zinc-300"
-                  )}
-                >
-                  PHT
-                </button>
+                {weeklyNews.map(w => (
+                  <button key={w.day} onClick={() => setActiveDay(w.day)} className={cn("px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all shrink-0", activeDay === w.day ? "bg-white text-black shadow-xl" : "text-zinc-500 hover:text-zinc-300")}>{w.day.substring(0, 3)}</button>
+                ))}
               </div>
-            </div>
-            
-            <div className="flex bg-black/40 p-1 rounded-2xl border border-white/5 backdrop-blur-md overflow-x-auto no-scrollbar w-full md:w-auto">
-              {weeklyNews.map(w => (
-                <button
-                  key={w.day}
-                  onClick={() => setActiveDay(w.day)}
-                  className={cn(
-                    "px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all shrink-0",
-                    activeDay === w.day ? "bg-white text-black shadow-xl" : "text-zinc-500 hover:text-zinc-300"
-                  )}
-                >
-                  {w.day.substring(0, 3)}
-                </button>
-              ))}
             </div>
           </div>
 
           <div className="space-y-6 relative z-10">
-            <div className="flex items-center gap-2 mb-4">
-              <span className="w-2 h-2 rounded-full bg-indigo-500 animate-ping" />
-              <span className="text-[8px] font-black text-indigo-500 uppercase tracking-widest text-shadow-glow">Live Institutional Feed Active</span>
-            </div>
             <AnimatePresence mode="wait">
-              <motion.div
-                key={activeDay}
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                className="space-y-4"
-              >
+              <motion.div key={activeDay} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4">
                 {currentNews.map((news) => (
-                  <motion.div 
-                    key={news.id}
-                    whileHover={{ scale: 1.005 }}
-                    className="group bg-black/40 border border-zinc-800/80 hover:border-indigo-500/40 rounded-3xl p-6 transition-all shadow-xl"
-                  >
+                  <motion.div key={news.id} whileHover={{ scale: 1.005 }} className="group bg-black/40 border border-zinc-800/80 hover:border-indigo-500/40 rounded-3xl p-6 transition-all shadow-xl">
                     <div className="flex flex-col gap-6">
                       <div className="flex items-center justify-between">
                          <div className="flex items-center gap-4">
                             <div className="relative shrink-0">
-                              <img src={getCurrencyLogo(news.currency)} alt={news.currency} className="w-12 h-12 rounded-2xl object-cover border-2 border-zinc-900 shadow-2xl" />
-                              <div className={cn(
-                                "absolute -top-1 -right-1 w-5 h-5 rounded-full border-2 border-zinc-950 shadow-lg",
-                                news.impact === 'high' ? "bg-rose-500" : news.impact === 'medium' ? "bg-orange-500" : "bg-emerald-500"
-                              )} />
+                               <img src={getCurrencyLogo(news.currency)} alt={news.currency} className="w-12 h-12 rounded-2xl object-cover border-2 border-zinc-900 shadow-2xl" />
+                               <div className={cn("absolute -top-1 -right-1 w-5 h-5 rounded-full border-2 border-zinc-950 shadow-lg", news.impact === 'high' ? "bg-rose-500" : news.impact === 'medium' ? "bg-orange-500" : "bg-emerald-500")} />
                             </div>
                             <div>
                                <div className="flex items-center gap-2 mb-0.5">
@@ -4984,181 +4833,90 @@ const BankForecast = () => {
                                <h4 className="text-lg font-black text-white group-hover:text-indigo-400 transition-colors uppercase tracking-tighter">{news.event}</h4>
                             </div>
                          </div>
-
                          <div className="group/info relative shrink-0">
-                            <button className="w-10 h-10 rounded-xl bg-zinc-900 border border-white/5 flex items-center justify-center hover:bg-white hover:text-black transition-all">
-                              <Info className="w-4 h-4" />
-                            </button>
+                            <button className="w-10 h-10 rounded-xl bg-zinc-900 border border-white/5 flex items-center justify-center hover:bg-white hover:text-black transition-all"><Info className="w-4 h-4" /></button>
                             <div className="absolute bottom-full right-0 mb-4 w-72 p-6 bg-zinc-950 border border-zinc-800 rounded-[2rem] shadow-[0_30px_60px_rgba(0,0,0,0.8)] opacity-0 invisible group-hover/info:opacity-100 group-hover/info:visible transition-all z-50 backdrop-blur-3xl">
-                              <div className="flex items-center gap-3 mb-4 pb-4 border-b border-white/5">
-                                <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
-                                  <Info className="w-4 h-4 text-emerald-500" />
-                                </div>
-                                <span className="text-[10px] font-black text-white uppercase tracking-widest">Institutional Bank Forecast</span>
-                              </div>
+                              <div className="flex items-center gap-3 mb-4 pb-4 border-b border-white/5"><div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center"><Info className="w-4 h-4 text-emerald-500" /></div><span className="text-[10px] font-black text-white uppercase tracking-widest">Bank Forecast</span></div>
                               <p className="text-xs font-medium text-zinc-400 leading-relaxed uppercase tracking-tight">{news.desc}</p>
-                              <div className="mt-4 pt-4 border-t border-white/5">
-                                 <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest block mb-1">Key Takeaway</span>
-                                 <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-tight italic">"{news.keyPoint}"</p>
-                              </div>
+                              <div className="mt-4 pt-4 border-t border-white/5"><span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest block mb-1">Key Takeaway</span><p className="text-[10px] font-bold text-emerald-400 uppercase tracking-tight italic">"{news.keyPoint}"</p></div>
                             </div>
                          </div>
                       </div>
-
                       <div className="space-y-4 pt-6 border-t border-white/5">
-                        <div className="flex items-center gap-2">
-                           <ShieldCheck className="w-3 h-3 text-indigo-400" />
-                           <span className="text-[8px] font-black text-zinc-500 uppercase tracking-[0.2em]">Institutional Bank Forecast Detail</span>
-                        </div>
+                        <div className="flex items-center gap-2"><ShieldCheck className="w-3 h-3 text-indigo-400" /><span className="text-[8px] font-black text-zinc-500 uppercase tracking-[0.2em]">Institutional Detail</span></div>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-zinc-950/50 rounded-2xl border border-white/5">
-                          <div className="space-y-1">
-                            <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest">Duration</span>
-                            <div className="flex items-center gap-2">
-                               <Clock className="w-3 h-3 text-zinc-500" />
-                               <span className="text-[10px] font-black text-zinc-300 uppercase">{news.duration}</span>
-                            </div>
-                          </div>
-                          <div className="space-y-1">
-                            <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest">Release Status</span>
-                            <div className="flex items-center gap-2">
-                               <div className={cn(
-                                 "w-1.5 h-1.5 rounded-full",
-                                 news.status === 'In Focus' ? "bg-emerald-500 animate-pulse" : 
-                                 news.status === 'Released' ? "bg-white/40" : "bg-zinc-700"
-                               )} />
-                               <span className={cn(
-                                 "text-[9px] font-black uppercase tracking-tighter",
-                                 news.status === 'In Focus' ? "text-emerald-500" : 
-                                 news.status === 'Released' ? "text-zinc-500" : "text-zinc-500"
-                               )}>{news.status}</span>
-                               {news.status === 'In Focus' && (
-                                 <div className="flex items-end gap-0.5 h-3">
-                                   <motion.div animate={{ height: [4, 8, 4] }} transition={{ repeat: Infinity, duration: 1 }} className="w-1 bg-emerald-500 rounded-full" />
-                                   <motion.div animate={{ height: [8, 12, 8] }} transition={{ repeat: Infinity, duration: 1, delay: 0.2 }} className="w-1 bg-emerald-500 rounded-full" />
-                                   <motion.div animate={{ height: [6, 10, 6] }} transition={{ repeat: Infinity, duration: 1, delay: 0.4 }} className="w-1 bg-emerald-500 rounded-full" />
-                                 </div>
-                               )}
-                            </div>
-                          </div>
-                          <div className="space-y-1">
-                            <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest">Forecast</span>
-                            <span className="text-[10px] font-black text-white block">{news.forecast}</span>
-                          </div>
-                          <div className="space-y-1">
-                            <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest">Previous</span>
-                            <span className="text-[10px] font-black text-white block">{news.previous}</span>
-                          </div>
+                          <div className="space-y-1"><span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest">Duration</span><div className="flex items-center gap-2"><Clock className="w-3 h-3 text-zinc-500" /><span className="text-[10px] font-black text-zinc-300 uppercase">{news.duration}</span></div></div>
+                          <div className="space-y-1"><span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest">Release Status</span><div className="flex items-center gap-2"><div className={cn("w-1.5 h-1.5 rounded-full", news.status === 'In Focus' ? "bg-emerald-500 animate-pulse" : news.status === 'Released' ? "bg-white/40" : "bg-zinc-700")} /><span className={cn("text-[9px] font-black uppercase tracking-tighter", news.status === 'In Focus' ? "text-emerald-500" : "text-zinc-500")}>{news.status}</span></div></div>
+                          <div className="space-y-1"><span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest">Forecast</span><span className="text-[10px] font-black text-white block">{news.forecast}</span></div>
+                          <div className="space-y-1"><span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest">Previous</span><span className="text-[10px] font-black text-white block">{news.previous}</span></div>
                         </div>
                       </div>
-
-                      {/* Playbook Scenarios (Inline) */}
                       <div className="flex flex-col md:flex-row gap-3 pt-6 border-t border-white/5">
-                        <div className="flex-1 p-4 bg-emerald-500/5 rounded-2xl border border-emerald-500/10 group/p">
-                          <div className="flex items-center justify-between mb-2">
-                             <span className="text-[8px] font-black text-emerald-500 uppercase tracking-widest">Above Forecast</span>
-                             <TrendingUp className="w-3 h-3 text-emerald-500 group-hover/p:rotate-12 transition-transform" />
-                          </div>
-                          <p className="text-[10px] font-black text-white uppercase tracking-tight">{news.impact === 'high' ? 'Very Bullish' : 'Bullish'}</p>
-                          <span className="text-[8px] font-bold text-emerald-500/60 uppercase tracking-widest leading-none">Expansion Target</span>
-                        </div>
-                        
-                        <div className="flex-1 p-4 bg-zinc-900/50 rounded-2xl border border-white/5 group/p">
-                          <div className="flex items-center justify-between mb-2">
-                             <span className="text-[8px] font-black text-zinc-500 uppercase tracking-widest">On Forecast</span>
-                             <RotateCw className="w-3 h-3 text-zinc-500 group-hover/p:rotate-180 transition-transform duration-700" />
-                          </div>
-                          <p className="text-[10px] font-black text-white uppercase tracking-tight">Ranging</p>
-                          <span className="text-[8px] font-bold text-zinc-600 uppercase tracking-widest leading-none">Equilibrium</span>
-                        </div>
-
-                        <div className="flex-1 p-4 bg-rose-500/5 rounded-2xl border border-rose-500/10 group/p">
-                          <div className="flex items-center justify-between mb-2">
-                             <span className="text-[8px] font-black text-rose-500 uppercase tracking-widest">Below Forecast</span>
-                             <TrendingDown className="w-3 h-3 text-rose-500 group-hover/p:-rotate-12 transition-transform" />
-                          </div>
-                          <p className="text-[10px] font-black text-white uppercase tracking-tight">{news.impact === 'high' ? 'Very Bearish' : 'Bearish'}</p>
-                          <span className="text-[8px] font-bold text-rose-500/60 uppercase tracking-widest leading-none">Structural Break</span>
-                        </div>
+                        <div className="flex-1 p-4 bg-emerald-500/5 rounded-2xl border border-emerald-500/10 group/p"><div className="flex items-center justify-between mb-2"><span className="text-[8px] font-black text-emerald-500 uppercase tracking-widest">Above</span><TrendingUp className="w-3 h-3 text-emerald-500 group-hover/p:rotate-12 transition-transform" /></div><p className="text-[10px] font-black text-white uppercase tracking-tight">{news.impact === 'high' ? 'Very Bullish' : 'Bullish'}</p></div>
+                        <div className="flex-1 p-4 bg-zinc-900/50 rounded-2xl border border-white/5 group/p"><div className="flex items-center justify-between mb-2"><span className="text-[8px] font-black text-zinc-500 uppercase tracking-widest">On</span><RotateCw className="w-3 h-3 text-zinc-500 group-hover/p:rotate-180 transition-transform duration-700" /></div><p className="text-[10px] font-black text-white uppercase tracking-tight">Ranging</p></div>
+                        <div className="flex-1 p-4 bg-rose-500/5 rounded-2xl border border-rose-500/10 group/p"><div className="flex items-center justify-between mb-2"><span className="text-[8px] font-black text-rose-500 uppercase tracking-widest">Below</span><TrendingDown className="w-3 h-3 text-rose-500 group-hover/p:-rotate-12 transition-transform" /></div><p className="text-[10px] font-black text-white uppercase tracking-tight">{news.impact === 'high' ? 'Very Bearish' : 'Bearish'}</p></div>
                       </div>
                     </div>
                   </motion.div>
                 ))}
               </motion.div>
             </AnimatePresence>
-            
-            <div className="mt-8 pt-8 border-t border-zinc-800">
-              <AINewsAnalysis news={currentNews} includeFutures={true} />
-            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <AINewsAnalysis news={currentNews} includeFutures={true} />
+        
+        {/* Institutional Correlation Matrix */}
+        <div className="bg-zinc-950 border border-zinc-800 rounded-[2.5rem] p-8 relative overflow-hidden shadow-2xl">
+          <div className="flex items-center justify-between mb-6">
+            <div><h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] mb-1">Correlation Matrix</h4><p className="text-[8px] text-zinc-500 font-bold uppercase tracking-widest">Cross-Asset Ties</p></div>
+            <Activity className="w-4 h-4 text-zinc-700" />
+          </div>
+          <div className="grid grid-cols-4 gap-2">
+            <div className="col-span-1" />
+            {['DXY', 'ES', 'NQ', 'BTC'].map(s => <div key={s} className="text-[8px] font-black text-zinc-600 text-center uppercase">{s}</div>)}
+            {['DXY', 'ES', 'NQ', 'BTC'].map((row, i) => (
+              <React.Fragment key={row}>
+                <div className="text-[8px] font-black text-zinc-600 uppercase flex items-center">{row}</div>
+                {['DXY', 'ES', 'NQ', 'BTC'].map((col, j) => {
+                  const val = i === j ? 1 : (Math.random() * 2 - 1).toFixed(2);
+                  const color = parseFloat(val as string) > 0.5 ? 'bg-emerald-500/10 text-emerald-400' : parseFloat(val as string) < -0.5 ? 'bg-rose-500/10 text-rose-400' : 'bg-zinc-900 text-zinc-500';
+                  return (<div key={j} className={cn("aspect-square rounded-lg flex items-center justify-center text-[7px] font-black border border-white/5", color)}>{val}</div>);
+                })}
+              </React.Fragment>
+            ))}
           </div>
         </div>
 
-        {/* Prediction Column */}
-        <div className="w-full lg:w-[450px] flex flex-col gap-6">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-[2.5rem] p-8 relative overflow-hidden group hover:border-indigo-500/20 transition-all shadow-2xl">
-            <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:scale-110 transition-transform duration-700">
-              <TargetIcon className="w-48 h-48 text-white" />
+        {/* Market Prediction */}
+        <div className="bg-zinc-900 border border-zinc-800 rounded-[2.5rem] p-8 relative overflow-hidden group hover:border-indigo-500/20 transition-all shadow-2xl">
+          <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:scale-110 transition-transform duration-700"><TargetIcon className="w-48 h-48 text-white" /></div>
+          <div className="flex items-center gap-3 mb-8 relative z-10"><div className="w-10 h-10 rounded-2xl bg-indigo-500/10 flex items-center justify-center border border-indigo-500/20"><TargetIcon className="w-5 h-5 text-indigo-500" /></div><div><h4 className="text-sm font-black text-white uppercase tracking-[0.2em]">MARKET PREDICTION</h4><p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Macro Bias</p></div></div>
+          <div className="space-y-6 relative z-10">
+            <div className="flex items-center justify-between bg-zinc-950 p-4 rounded-2xl border border-zinc-800">
+              <select value={selectedAsset} onChange={(e) => setSelectedAsset(e.target.value)} className="bg-transparent text-sm font-black text-white uppercase outline-none cursor-pointer hover:text-emerald-400 transition-colors">
+                <optgroup label="Futures">
+                  <option value="ES1!">E-mini S&P 500 (ES)</option>
+                  <option value="NQ1!">E-mini Nasdaq (NQ)</option>
+                </optgroup>
+                <optgroup label="Forex/Metals">
+                  <option value="EURUSD">EUR/USD</option>
+                  <option value="XAUUSD">GOLD (GC)</option>
+                </optgroup>
+              </select>
+              <div className="flex items-center gap-2 px-3 py-1 bg-emerald-500/10 rounded-full border border-emerald-500/20"><div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /><span className="text-[9px] font-black text-emerald-400 uppercase tracking-tighter">Liquid Zone</span></div>
             </div>
-            
-            <div className="flex items-center gap-3 mb-8 relative z-10">
-              <div className="w-10 h-10 rounded-2xl bg-indigo-500/10 flex items-center justify-center border border-indigo-500/20">
-                <TargetIcon className="w-5 h-5 text-indigo-500" />
-              </div>
-              <div>
-                <h4 className="text-sm font-black text-white uppercase tracking-[0.2em]">MARKET PREDICTION</h4>
-                <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Macro Bias / Futures</p>
-              </div>
-            </div>
-            
-            <div className="space-y-6 relative z-10">
-              <div className="flex items-center justify-between bg-zinc-950 p-4 rounded-2xl border border-zinc-800">
-                <select 
-                  value={selectedAsset} 
-                  onChange={(e) => setSelectedAsset(e.target.value)}
-                  className="bg-transparent text-sm font-black text-white uppercase outline-none cursor-pointer hover:text-emerald-400 transition-colors"
-                >
-                  <optgroup label="Futures">
-                    <option value="ES1!">E-mini S&P 500 (ES)</option>
-                    <option value="NQ1!">E-mini Nasdaq (NQ)</option>
-                    <option value="MES1!">Micro S&P 500 (MES)</option>
-                    <option value="MNQ1!">Micro Nasdaq (MNQ)</option>
-                  </optgroup>
-                  <optgroup label="Forex/Metals">
-                    <option value="EURUSD">EUR/USD</option>
-                    <option value="GBPUSD">GBP/USD</option>
-                    <option value="XAUUSD">GOLD (GC)</option>
-                  </optgroup>
-                </select>
-                <div className="flex items-center gap-2 px-3 py-1 bg-emerald-500/10 rounded-full border border-emerald-500/20">
-                   <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                   <span className="text-[9px] font-black text-emerald-400 uppercase tracking-widest tracking-tighter">Liquid Zone</span>
-                </div>
-              </div>
-
-              <div className="p-6 bg-zinc-950 border border-zinc-800 rounded-3xl group/card relative overflow-hidden">
-                <div className="flex items-center gap-4 mb-4">
-                  <div className="w-10 h-10 rounded-full border-2 border-zinc-900 overflow-hidden shadow-xl">
-                    <img src={getCurrencyLogo(selectedAsset.includes('USD') ? selectedAsset.substring(0, 3) : 'USD')} className="w-full h-full object-cover" />
-                  </div>
-                  <div>
-                    <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block mb-0.5">Asset Impact</span>
-                    <h5 className="text-white font-black uppercase text-xl tracking-tighter">{selectedAsset} Manipulation</h5>
-                  </div>
-                </div>
-                
-                <p className="text-xs font-medium text-zinc-500 leading-relaxed group-hover:text-zinc-300 transition-colors">
-                  The current institutional bias on {selectedAsset} is leaning toward a <span className="text-rose-500 font-bold underline decoration-rose-500/30">Stop Hunt</span> manipulation below the Asian session lows. Major news event at 08:30 expects a liquidity sweep into the FVG (Fair Value Gap) before a structural expansion higher.
-                </p>
-                
-                <div className="mt-6 flex flex-wrap gap-2">
-                  <div className="px-3 py-1.5 bg-rose-500/10 text-rose-400 rounded-xl text-[9px] font-black uppercase tracking-widest border border-rose-500/20">Sell-Side Liquidity</div>
-                  <div className="px-3 py-1.5 bg-emerald-500/10 text-emerald-400 rounded-xl text-[9px] font-black uppercase tracking-widest border border-emerald-500/20">Order Block Re-entry</div>
-                </div>
-              </div>
+            <div className="p-6 bg-zinc-950 border border-zinc-800 rounded-3xl group/card relative overflow-hidden">
+              <div className="flex items-center gap-4 mb-4"><div className="w-10 h-10 rounded-full border-2 border-zinc-900 overflow-hidden shadow-xl"><img src={getCurrencyLogo(selectedAsset.includes('USD') ? selectedAsset.substring(0, 3) : 'USD')} className="w-full h-full object-cover" /></div><div><span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block mb-0.5">Asset Impact</span><h5 className="text-white font-black uppercase text-xl tracking-tighter">{selectedAsset} Bias</h5></div></div>
+              <p className="text-xs font-medium text-zinc-500 leading-relaxed group-hover:text-zinc-300 transition-colors">Bias on {selectedAsset} is leaning toward a <span className="text-rose-500 font-bold underline decoration-rose-500/30">Stop Hunt</span> below session lows. Liquidity sweep into the FVG expected.</p>
             </div>
           </div>
         </div>
       </div>
-    );
+    </div>
+  );
 };
 
 const FuturesMarquee = () => {
