@@ -19,6 +19,7 @@ import {
   Cpu,
   Minus,
   AlertCircle,
+  AlertTriangle,
   Menu as HamburgerIcon,
   X,
   CreditCard,
@@ -1168,11 +1169,22 @@ const StatsCard = ({ label, value, subValue, trend, icon: Icon, type = 'normal' 
 
 // --- Pages ---
 
-const Dashboard = ({ stats, trades, onTabChange, profileName, currency, hidePnL, user, onUpdateTrade, startingBalance }: { stats: DashboardStats, trades: Trade[], onTabChange: (tab: string) => void, profileName: string, currency: string, hidePnL: boolean, user: User | null, onUpdateTrade: (id: string, updates: Partial<Trade>) => void, startingBalance: number }) => {
+const Dashboard = ({ stats, trades, onTabChange, profileName, currency, hidePnL, user, onUpdateTrade, startingBalance, onSelectExecution }: { 
+  stats: DashboardStats, 
+  trades: Trade[], 
+  onTabChange: (tab: string) => void, 
+  profileName: string, 
+  currency: string, 
+  hidePnL: boolean, 
+  user: User | null, 
+  onUpdateTrade: (id: string, updates: Partial<Trade>) => void, 
+  startingBalance: number,
+  onSelectExecution: (id: string) => void
+}) => {
   const [showExportModal, setShowExportModal] = useState(false);
   const [selectedRange, setSelectedRange] = useState('All Time');
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
-  const [chartType, setChartType] = useState<'line' | 'ogive' | 'scatter' | 'cubic' | 'bar'>('line');
+  const [chartType, setChartType] = useState<'line' | 'ogive' | 'scatter' | 'cubic' | 'bar'>('ogive');
   const [selectedTrade, setSelectedTrade] = useState<Trade | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -1410,6 +1422,94 @@ const Dashboard = ({ stats, trades, onTabChange, profileName, currency, hidePnL,
           />
         )}
       </AnimatePresence>
+      
+      <JournalSlideshow 
+        trades={trades} 
+        onSelectTrade={onSelectExecution} 
+      />
+    </div>
+  );
+};
+
+const JournalSlideshow = ({ trades, onSelectTrade }: { trades: Trade[], onSelectTrade: (id: string) => void }) => {
+  const images = useMemo(() => {
+    const collected: { src: string, date: string, pnl: number, asset: string, id: string }[] = [];
+    trades.forEach(t => {
+      if (t.screenshot) collected.push({ src: t.screenshot, date: t.entryDate, pnl: t.pnl, asset: t.asset, id: t.id });
+      if (t.executionImage) collected.push({ src: t.executionImage, date: t.entryDate, pnl: t.pnl, asset: t.asset, id: t.id });
+    });
+    
+    if (collected.length === 0) return [];
+    
+    let finalImages = [...collected];
+    // If less than 5, repeat until at least 5 as requested
+    while (finalImages.length < 5) {
+      finalImages = [...finalImages, ...collected];
+    }
+    // Triple it for a truly seamless transition especially if images are wide
+    return [...finalImages, ...finalImages, ...finalImages];
+  }, [trades]);
+
+  if (images.length === 0) return null;
+
+  return (
+    <div className="mt-16 w-full overflow-hidden pb-8 border-t border-zinc-900 pt-16">
+      <div className="flex items-center justify-between px-4 mb-8">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center">
+            <LayoutGrid className="w-4 h-4 text-emerald-500" />
+          </div>
+          <div>
+            <h4 className="text-sm font-black text-white uppercase tracking-widest">Journal Archive</h4>
+            <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-[0.2em] opacity-60">Visual execution history</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+           <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+           <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest">Live Feed active</span>
+        </div>
+      </div>
+      
+      <div className="relative flex overflow-hidden">
+        <motion.div 
+          className="flex gap-6 py-4 px-4"
+          initial={{ x: "-33.33%" }}
+          animate={{ x: "0%" }} // Moving from left to right as requested (items move towards right)
+          transition={{ 
+            repeat: Infinity, 
+            duration: 30, 
+            ease: "linear" 
+          }}
+          whileHover={{ transition: { duration: 100 } }} // Slow down on hover for inspection
+        >
+          {images.map((img, idx) => (
+            <div 
+              key={idx} 
+              onClick={() => onSelectTrade(img.id)}
+              className="w-[320px] h-[200px] rounded-[2.5rem] overflow-hidden border border-white/5 shadow-2xl flex-shrink-0 bg-zinc-900/50 backdrop-blur-xl group relative cursor-pointer"
+            >
+               <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity z-10" />
+               <img 
+                 src={img.src} 
+                 alt={`Journal entry ${idx}`} 
+                 className="w-full h-full object-cover opacity-60 group-hover:opacity-100 group-hover:scale-110 transition-all duration-700" 
+                 referrerPolicy="no-referrer"
+                 onError={(e) => {
+                   (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1611974717483-3600997e550c?q=80&w=320&h=200&auto=format&fit=crop';
+                 }}
+               />
+               <div className="absolute bottom-6 left-6 z-20 opacity-0 group-hover:opacity-100 translate-y-4 group-hover:translate-y-0 transition-all duration-500">
+                  <div className="px-6 py-4 bg-black/80 backdrop-blur-xl rounded-[2rem] border border-white/10 space-y-1 shadow-2xl">
+                     <p className="text-[18px] font-black text-white uppercase tracking-tighter">{img.asset} • {format(new Date(img.date), 'MMM dd, yyyy')}</p>
+                     <p className={cn("text-[16px] font-black uppercase tracking-widest", img.pnl >= 0 ? "text-emerald-400" : "text-rose-400")}>
+                        {img.pnl >= 0 ? '+' : ''}{img.pnl.toFixed(2)}
+                     </p>
+                  </div>
+               </div>
+            </div>
+          ))}
+        </motion.div>
+      </div>
     </div>
   );
 };
@@ -1460,7 +1560,7 @@ const PnLCalendar = ({ trades, setSelectedTrade, currency, hidePnL }: { trades: 
 
       <div className="grid grid-cols-7">
         {calendarDays.map((day, idx) => {
-          const dayTrades = trades.filter(t => isSameDay(parseISO(t.exitDate), day));
+          const dayTrades = (trades || []).filter(t => isSameDay(parseISO(t.exitDate), day));
           const dayPnL = dayTrades.reduce((acc, t) => acc + t.pnl, 0);
           const isCurrentMonth = isSameDay(startOfMonth(day), startOfMonth(currentMonth));
           const isToday = isSameDay(day, new Date());
@@ -4462,17 +4562,18 @@ const AINewsAnalysis = ({ news, includeFutures = true }: { news: any[], includeF
     outcomes: { label: string, probability: number, color: string }[]
   } | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
 
   const analyzeNews = async () => {
     setLoading(true);
+    setError(null);
     try {
       const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY || '';
       if (!apiKey) {
-        setLoading(false);
-        return;
+        throw new Error('AI API Key not found. Please check your implementation.');
       }
-      const genAI = new GoogleGenAI({ apiKey });
+      const ai = new GoogleGenAI({ apiKey });
       
       const prompt = `Act as a senior Quantitative Analyst. Analyze the following global news events for the current week and provide a deep market sentiment analysis${includeFutures ? ' specifically focusing on Indices, Commodities, and Futures (CME/CBOT)' : ''}. 
       
@@ -4500,17 +4601,31 @@ const AINewsAnalysis = ({ news, includeFutures = true }: { news: any[], includeF
       }.
       News Events: ${JSON.stringify(news)}`;
 
-      const response = await genAI.models.generateContent({
+      const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
-        contents: prompt
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json"
+        }
       });
       
       const text = response.text || '';
       const cleanedText = text.replace(/```json|```/g, '').trim();
-      setAnalysis(JSON.parse(cleanedText));
+      const parsed = JSON.parse(cleanedText);
+      
+      if (!parsed || typeof parsed !== 'object') throw new Error('Invalid AI response format');
+      
+      setAnalysis({
+        sentiment: parsed.sentiment || 'neutral',
+        confidence: parsed.confidence || 50,
+        reasoning: parsed.reasoning || 'Market analysis unavailable.',
+        scenarios: Array.isArray(parsed.scenarios) ? parsed.scenarios : [],
+        outcomes: Array.isArray(parsed.outcomes) ? parsed.outcomes : []
+      });
       setLastUpdated(new Date().toLocaleTimeString());
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      setError(e.message || "Failed to sync with AI Alpha servers.");
       setAnalysis({ 
         sentiment: 'neutral', 
         confidence: 50, 
@@ -4532,11 +4647,15 @@ const AINewsAnalysis = ({ news, includeFutures = true }: { news: any[], includeF
   };
 
   useEffect(() => {
-    if (news.length > 0) analyzeNews();
+    if (news.length > 0) {
+      analyzeNews();
+    } else {
+      setAnalysis(null);
+    }
   }, [news]);
 
   return (
-    <div className="bg-zinc-950 border border-zinc-800 rounded-3xl p-8 backdrop-blur-xl group hover:border-emerald-500/20 transition-all shadow-xl relative overflow-hidden">
+    <div className="bg-zinc-950 border border-zinc-800 rounded-3xl p-8 backdrop-blur-xl group hover:border-emerald-500/20 transition-all shadow-xl relative overflow-hidden h-full">
       {/* Decorative Liquidity Pattern */}
       <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/5 blur-[100px] rounded-full -mr-32 -mt-32 pointer-events-none" />
       <div className="absolute bottom-0 left-0 w-64 h-64 bg-indigo-500/5 blur-[100px] rounded-full -ml-32 -mb-32 pointer-events-none" />
@@ -4560,14 +4679,29 @@ const AINewsAnalysis = ({ news, includeFutures = true }: { news: any[], includeF
             <div className="w-4 h-4 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
           </div>
         ) : (
-          <button 
-            onClick={analyzeNews}
-            className="p-2 hover:bg-white/5 rounded-lg transition-colors border border-transparent hover:border-white/10"
-          >
-            <RotateCw className="w-4 h-4 text-zinc-500 hover:text-emerald-500" />
-          </button>
+          <div className="flex items-center gap-3">
+            {error && (
+              <span className="text-[8px] font-black text-rose-500 uppercase tracking-widest animate-pulse border border-rose-500/20 px-2 py-0.5 rounded">
+                Sync Error
+              </span>
+            )}
+            <button 
+              onClick={analyzeNews}
+              disabled={news.length === 0}
+              className="p-2 hover:bg-white/5 rounded-lg transition-colors border border-transparent hover:border-white/10 disabled:opacity-20"
+            >
+              <RotateCw className={cn("w-4 h-4 text-zinc-500 hover:text-emerald-500", error && "text-rose-500")} />
+            </button>
+          </div>
         )}
       </div>
+
+      {error && (
+        <div className="mb-6 p-4 bg-rose-500/5 border border-rose-500/10 rounded-2xl flex items-center gap-3">
+          <AlertTriangle className="w-4 h-4 text-rose-500" />
+          <p className="text-[10px] font-black text-rose-400 uppercase tracking-widest">{error}</p>
+        </div>
+      )}
 
       {analysis ? (
         <div className="space-y-8 relative z-10">
@@ -4614,8 +4748,7 @@ const AINewsAnalysis = ({ news, includeFutures = true }: { news: any[], includeF
               <div className="h-2.5 bg-zinc-900 rounded-full overflow-hidden border border-zinc-800">
                 <motion.div 
                   initial={{ width: 0 }}
-                  whileInView={{ width: `${analysis.confidence}%` }}
-                  viewport={{ once: true }}
+                  animate={{ width: `${analysis.confidence}%` }}
                   className={cn(
                     "h-full rounded-full transition-all duration-1000",
                     analysis.sentiment === 'bullish' ? "bg-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.4)]" : analysis.sentiment === 'bearish' ? "bg-rose-500 shadow-[0_0_20px_rgba(244,63,94,0.4)]" : "bg-zinc-500 shadow-lg"
@@ -4639,7 +4772,7 @@ const AINewsAnalysis = ({ news, includeFutures = true }: { news: any[], includeF
           <div className="space-y-4">
             <h5 className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em] mb-4">Leading Outcome Scenarios</h5>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              {analysis.scenarios.map((s, i) => (
+              {analysis.scenarios?.map((s, i) => (
                 <div key={i} className="p-4 bg-zinc-950 border border-zinc-800 rounded-2xl group hover:border-white/20 transition-all hover:bg-zinc-900/50 relative overflow-hidden">
                   <div className="absolute top-0 right-0 p-2 opacity-5 pointer-events-none group-hover:scale-110 transition-transform text-white">
                     <TargetIcon className="w-12 h-12" />
@@ -4776,6 +4909,12 @@ const BankForecast = () => {
     return logos[curr] || 'https://flagpedia.net/data/flags/w580/un.png';
   };
 
+  const weekRange = useMemo(() => {
+    const start = startOfWeek(new Date(), { weekStartsOn: 1 });
+    const end = endOfWeek(new Date(), { weekStartsOn: 1 });
+    return `${format(start, 'MMMM dd')} — ${format(end, 'MMMM dd, yyyy')}`;
+  }, []);
+
   return (
     <div className="mb-16 space-y-8">
       <div className="flex flex-col lg:flex-row gap-8">
@@ -4794,7 +4933,7 @@ const BankForecast = () => {
                   <span className="text-[8px] font-black uppercase tracking-widest">Live Institutional Feed Active</span>
                 </div>
               </div>
-              <p className="text-[10px] text-zinc-500 font-black uppercase tracking-[0.2em]">Monitoring May 04 &mdash; May 10, 2026</p>
+              <p className="text-[10px] text-zinc-500 font-black uppercase tracking-[0.2em]">Monitoring {weekRange}</p>
             </div>
             
             <div className="flex flex-col sm:flex-row gap-2">
@@ -4871,22 +5010,78 @@ const BankForecast = () => {
         {/* Institutional Correlation Matrix */}
         <div className="bg-zinc-950 border border-zinc-800 rounded-[2.5rem] p-8 relative overflow-hidden shadow-2xl">
           <div className="flex items-center justify-between mb-6">
-            <div><h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] mb-1">Correlation Matrix</h4><p className="text-[8px] text-zinc-500 font-bold uppercase tracking-widest">Cross-Asset Ties</p></div>
+            <div>
+              <h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] mb-1">Correlation Matrix</h4>
+              <p className="text-[8px] text-zinc-500 font-bold uppercase tracking-widest">Cross-Asset Ties • Stable</p>
+            </div>
             <Activity className="w-4 h-4 text-zinc-700" />
           </div>
-          <div className="grid grid-cols-4 gap-2">
+          
+          <div className="grid grid-cols-5 gap-3">
+            {/* Headers */}
             <div className="col-span-1" />
-            {['DXY', 'ES', 'NQ', 'BTC'].map(s => <div key={s} className="text-[8px] font-black text-zinc-600 text-center uppercase">{s}</div>)}
+            {['DXY', 'ES', 'NQ', 'BTC'].map(s => (
+              <div key={s} className="text-[9px] font-black text-zinc-500 text-center uppercase tracking-tighter">{s}</div>
+            ))}
+            
+            {/* Rows */}
             {['DXY', 'ES', 'NQ', 'BTC'].map((row, i) => (
               <React.Fragment key={row}>
-                <div className="text-[8px] font-black text-zinc-600 uppercase flex items-center">{row}</div>
+                <div className="text-[9px] font-black text-zinc-400 uppercase flex items-center">{row}</div>
                 {['DXY', 'ES', 'NQ', 'BTC'].map((col, j) => {
-                  const val = i === j ? 1 : (Math.random() * 2 - 1).toFixed(2);
-                  const color = parseFloat(val as string) > 0.5 ? 'bg-emerald-500/10 text-emerald-400' : parseFloat(val as string) < -0.5 ? 'bg-rose-500/10 text-rose-400' : 'bg-zinc-900 text-zinc-500';
-                  return (<div key={j} className={cn("aspect-square rounded-lg flex items-center justify-center text-[7px] font-black border border-white/5", color)}>{val}</div>);
+                  // Stable correlation values using a simple seeded-like logic or just consistent ones
+                  const correlations: Record<string, Record<string, number>> = {
+                    DXY: { DXY: 1.00, ES: -0.82, NQ: -0.78, BTC: -0.45 },
+                    ES:  { DXY: -0.82, ES: 1.00, NQ: 0.94, BTC: 0.52 },
+                    NQ:  { DXY: -0.78, ES: 0.94, NQ: 1.00, BTC: 0.58 },
+                    BTC: { DXY: -0.45, ES: 0.52, NQ: 0.58, BTC: 1.00 }
+                  };
+                  const val = correlations[row][col];
+                  
+                  const isPositive = val > 0;
+                  const absVal = Math.abs(val);
+                  
+                  let colorClass = "bg-zinc-900/50 text-zinc-500 border-zinc-800/50";
+                  if (val === 1) {
+                    colorClass = "bg-white text-black border-white font-black";
+                  } else if (isPositive) {
+                    if (absVal > 0.8) colorClass = "bg-emerald-500 text-black border-emerald-400 font-black";
+                    else if (absVal > 0.5) colorClass = "bg-emerald-500/20 text-emerald-400 border-emerald-500/30 font-bold";
+                    else colorClass = "bg-emerald-500/10 text-emerald-500/60 border-emerald-500/10";
+                  } else {
+                    if (absVal > 0.8) colorClass = "bg-rose-500 text-black border-rose-400 font-black";
+                    else if (absVal > 0.5) colorClass = "bg-rose-500/20 text-rose-400 border-rose-500/30 font-bold";
+                    else colorClass = "bg-rose-500/10 text-rose-500/60 border-rose-500/10";
+                  }
+
+                  return (
+                    <div 
+                      key={j} 
+                      className={cn(
+                        "aspect-square rounded-xl flex items-center justify-center text-[9px] border transition-all duration-300 hover:scale-110 hover:z-10 shadow-lg", 
+                        colorClass
+                      )}
+                    >
+                      {val.toFixed(2)}
+                    </div>
+                  );
                 })}
               </React.Fragment>
             ))}
+          </div>
+          
+          <div className="mt-8 flex items-center justify-between pt-6 border-t border-white/5">
+             <div className="flex items-center gap-4">
+                <div className="flex items-center gap-1.5">
+                   <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                   <span className="text-[7px] font-black text-zinc-500 uppercase tracking-widest">Positive</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                   <div className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                   <span className="text-[7px] font-black text-zinc-500 uppercase tracking-widest">Negative</span>
+                </div>
+             </div>
+             <span className="text-[7px] font-black text-zinc-700 uppercase tracking-widest italic">V-SYNC ACTIVE</span>
           </div>
         </div>
 
@@ -5193,25 +5388,25 @@ const MarketBannerSlider = () => {
   );
 };
 
-const AIInsights = ({ starredSymbol }: { starredSymbol: string | null }) => {
+const NYCOpenBiasAnalyst = ({ starredSymbol }: { starredSymbol: string | null }) => {
   const [analysis, setAnalysis] = useState<{
-    sentiment: 'bullish' | 'bearish' | 'neutral',
+    bias: 'Bullish' | 'Bearish' | 'Neutral',
     confidence: number,
-    reasoning: string,
-    probabilities: { bullish: number, neutral: number, bearish: number },
-    key_levels?: { type: string, price: string, rationale: string }[]
+    openContext: string,
+    targets: { price: string, type: 'Profit' | 'Stop' | 'Liquidity', rationale: string }[],
+    volatility: 'Low' | 'Medium' | 'High',
+    drawOnLiquidity: string
   } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Auto-trigger analysis when seeded with a symbol
   useEffect(() => {
     if (starredSymbol && !analysis && !loading && !error) {
-       getInsights();
+       getBiasAnalysis();
     }
   }, [starredSymbol]);
 
-  const getInsights = async () => {
+  const getBiasAnalysis = async () => {
     if (!starredSymbol) return;
     setLoading(true);
     setAnalysis(null);
@@ -5226,30 +5421,32 @@ const AIInsights = ({ starredSymbol }: { starredSymbol: string | null }) => {
       }
 
       const ai = new GoogleGenAI({ apiKey });
-      const prompt = `Act as a senior Quantitative Strategist at a Tier-1 bulge bracket bank. 
-      Analyze the current institutional market structure and sentiment for: ${starredSymbol}. 
       
-      Provide a comprehensive focus report including:
-      1. Institutional Bias (Bullish/Bearish/Neutral)
-      2. Confidence Score based on current volume profile and HTF confluence.
-      3. Precise reasoning focusing on liquidity zones and structural shifts.
-      4. Prediction market probabilities for the next 24-48 hours.
-      5. Identify 3 critical key levels (Support/Resistance/OB/FVG) that algorithms are focusing on.
+      const prompt = `Act as a senior NYC Institutional Desk Trader and ICT specialist. 
+      Analyze the current session bias for the NYC Market Open (AM Session) for: ${starredSymbol}.
+
+      Provide a high-conviction Bias Report including:
+      1. Session Bias (Bullish/Bearish/Neutral) relative to the NYC Midnight Open.
+      2. Draw on Liquidity (Where is the market price most likely headed this session?).
+      3. Open Context: Explain if we expect a 'Judas Swing' (manipulation) or an immediate expansion.
+      4. Volatility Expectations (High/Medium/Low) for the 9:30 AM NY Open.
+      5. Identify 3 specific targets (Profit targets or Liquidity pools) for the session.
 
       Respond ONLY in JSON format:
       {
-        "sentiment": "bullish" | "bearish" | "neutral",
-        "confidence": number,
-        "reasoning": "string (short professional summary)",
-        "probabilities": { "bullish": number, "neutral": number, "bearish": number },
-        "key_levels": [
-           { "type": "string", "price": "string", "rationale": "string" }
+        "bias": "Bullish" | "Bearish" | "Neutral",
+        "confidence": number (0-100),
+        "openContext": "string (short technical summary)",
+        "volatility": "Low" | "Medium" | "High",
+        "drawOnLiquidity": "string (specific target zone)",
+        "targets": [
+           { "price": "string", "type": "Profit" | "Stop" | "Liquidity", "rationale": "string" }
         ]
       }`;
       
       const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
-        contents: [{ parts: [{ text: prompt }] }],
+        contents: prompt,
         config: {
           responseMimeType: "application/json"
         }
@@ -5257,173 +5454,191 @@ const AIInsights = ({ starredSymbol }: { starredSymbol: string | null }) => {
       
       const text = response.text || "";
       const cleanedText = text.replace(/```json|```/g, '').trim();
-      setAnalysis(JSON.parse(cleanedText));
+      const parsed = JSON.parse(cleanedText);
+      
+      setAnalysis({
+        bias: parsed.bias || 'Neutral',
+        confidence: parsed.confidence || 50,
+        openContext: parsed.openContext || 'Technical analysis pending...',
+        volatility: parsed.volatility || 'Medium',
+        drawOnLiquidity: parsed.drawOnLiquidity || 'Neutral range',
+        targets: Array.isArray(parsed.targets) ? parsed.targets : []
+      });
     } catch (err: any) {
-      console.error('AI Insights Error:', err);
-      setError(err?.message || 'Failed to generate market insights. Ensure your connection and API key are valid.');
-      setAnalysis(null);
+      console.error('NYC Bias Analysis Error:', err);
+      setError(err?.message || 'Failed to sync with institutional data.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="mt-12 p-10 bg-zinc-950 rounded-[3rem] border border-zinc-900 border-dashed relative overflow-hidden group">
-      <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity">
-        <Sparkles className="w-32 h-32 text-emerald-500" />
-      </div>
+    <div className="mt-12 p-8 md:p-12 bg-zinc-950 rounded-[3rem] border border-zinc-900 border-dashed relative overflow-hidden group">
+      {/* Decorative Session Overlay */}
+      <div className="absolute top-0 right-0 w-full h-full bg-gradient-to-br from-indigo-500/5 via-transparent to-transparent opacity-50 pointer-events-none" />
       
       <div className="relative z-10">
-        <div className="flex items-center gap-4 mb-8">
-          <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 flex items-center justify-center">
-            <Sparkles className="w-6 h-6 text-indigo-500" />
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 mb-12">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-2xl bg-indigo-500/10 flex items-center justify-center border border-indigo-500/20 shadow-xl shadow-indigo-500/5">
+              <ZapIcon className="w-7 h-7 text-indigo-500" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-black text-white uppercase tracking-tight">NYC Session Bias Analyst</h2>
+              <div className="flex items-center gap-2 mt-1">
+                 <span className="text-[10px] text-zinc-500 font-black uppercase tracking-widest">{starredSymbol || 'Select an asset'}</span>
+                 <div className="w-1 h-1 rounded-full bg-zinc-700" />
+                 <span className="text-[8px] text-zinc-600 font-bold uppercase tracking-[0.2em]">Institutional AM Engine</span>
+              </div>
+            </div>
           </div>
-          <div>
-            <h2 className="text-2xl font-black text-white uppercase tracking-tight">AI Intelligence Focus</h2>
-            <p className="text-xs text-zinc-500 font-bold uppercase tracking-widest opacity-60">Deep analysis for {starredSymbol || 'focused asset'}</p>
-          </div>
+
+          {starredSymbol && !loading && !error && (
+            <button 
+              onClick={getBiasAnalysis}
+              className="px-6 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white rounded-xl border border-zinc-800 transition-all text-[9px] font-black uppercase tracking-widest flex items-center gap-2 shadow-xl"
+            >
+              <RotateCw className="w-3.5 h-3.5" />
+              Recalibrate Bias
+            </button>
+          )}
         </div>
 
         {!starredSymbol ? (
-          <div className="py-12 text-center border-2 border-zinc-900 border-dashed rounded-[2rem] bg-zinc-900/10 backdrop-blur-sm">
-            <p className="text-zinc-500 text-sm italic">Star an asset to receive targeted AI insights.</p>
+          <div className="py-16 text-center border-2 border-zinc-900 border-dashed rounded-[2.5rem] bg-black/40 backdrop-blur-xl">
+             <TargetIcon className="w-12 h-12 text-zinc-800 mx-auto mb-4" />
+             <p className="text-zinc-600 text-xs font-black uppercase tracking-[0.2em]">Star an asset to focus the algorithm.</p>
           </div>
-        ) : (
-          <div className="space-y-8">
-            {error === 'API_KEY_MISSING' ? (
-              <div className="p-8 bg-indigo-500/5 border border-indigo-500/20 rounded-[2rem] text-center space-y-4">
-                <div className="w-16 h-16 rounded-full bg-indigo-500/10 flex items-center justify-center mx-auto">
-                  <Lock className="w-8 h-8 text-indigo-400" />
+        ) : loading ? (
+          <div className="py-24 text-center space-y-6">
+            <div className="flex items-center justify-center gap-1">
+              {[0, 1, 2].map(i => (
+                <motion.div
+                  key={i}
+                  animate={{ scale: [1, 1.2, 1], opacity: [0.3, 1, 0.3] }}
+                  transition={{ repeat: Infinity, duration: 1.5, delay: i * 0.2 }}
+                  className="w-2 h-2 bg-indigo-500 rounded-full"
+                />
+              ))}
+            </div>
+            <p className="text-[9px] font-black text-zinc-500 uppercase tracking-[0.4em] animate-pulse">Scanning Institutional Liquidity...</p>
+          </div>
+        ) : error ? (
+          <div className="py-12 p-8 bg-rose-500/5 border border-rose-500/10 rounded-3xl text-center space-y-4">
+             <AlertTriangle className="w-8 h-8 text-rose-500 mx-auto" />
+             <p className="text-xs font-black text-rose-400 uppercase tracking-widest">{error}</p>
+             {error === 'API_KEY_MISSING' && (
+               <button 
+                 onClick={async () => {
+                   const aiStudio = (window as any).aistudio;
+                   if (aiStudio?.openSelectKey) await aiStudio.openSelectKey();
+                   getBiasAnalysis();
+                 }}
+                 className="px-8 py-3 bg-white text-black rounded-xl text-[9px] font-black uppercase tracking-widest hover:scale-105 transition-all"
+               >
+                 Activate AI Engine
+               </button>
+             )}
+          </div>
+        ) : analysis ? (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            {/* Main Bias Card */}
+            <div className="lg:col-span-4 space-y-6">
+              <div className="bg-black/40 p-10 rounded-[2.5rem] border border-zinc-900 relative overflow-hidden h-full flex flex-col justify-center">
+                <div className={cn(
+                  "absolute -top-10 -right-10 w-40 h-40 blur-[80px] opacity-20",
+                  analysis.bias === 'Bullish' ? 'bg-emerald-500' : analysis.bias === 'Bearish' ? 'bg-rose-500' : 'bg-zinc-500'
+                )} />
+                
+                <h3 className="text-[10px] font-black text-zinc-400 uppercase tracking-[0.2em] mb-4">Current Bias</h3>
+                <div className="relative z-10 mb-6">
+                  <span className={cn(
+                    "text-6xl font-black italic tracking-tighter uppercase",
+                    analysis.bias === 'Bullish' ? 'text-emerald-500' : analysis.bias === 'Bearish' ? 'text-rose-500' : 'text-zinc-500'
+                  )}>
+                    {analysis.bias}
+                  </span>
                 </div>
-                <div>
-                  <h3 className="text-xl font-black text-white uppercase tracking-tight mb-2">AI Access Required</h3>
-                  <p className="text-[10px] text-zinc-500 max-w-sm mx-auto font-medium uppercase tracking-widest leading-relaxed">
-                    To leverage ZYNC's Intelligence Focus, configure a Gemini API key. 
-                    This enables real-time market analysis and sentiment detection.
-                  </p>
-                </div>
-                <button 
-                  onClick={async () => {
-                    const aiStudio = (window as any).aistudio;
-                    if (aiStudio?.openSelectKey) {
-                      await aiStudio.openSelectKey();
-                      getInsights();
-                    } else {
-                      setError('Please configure GEMINI_API_KEY in your settings.');
-                    }
-                  }}
-                  className="px-8 py-3 bg-indigo-500 text-white rounded-xl text-[9px] font-black uppercase tracking-widest shadow-lg shadow-indigo-500/20 hover:scale-105 transition-all"
-                >
-                  Configure AI Credentials
-                </button>
-              </div>
-            ) : error ? (
-              <div className="p-6 bg-rose-500/10 border border-rose-500/20 rounded-2xl flex flex-col items-center gap-3">
-                <AlertCircle className="w-8 h-8 text-rose-500" />
-                <p className="text-[10px] font-black text-rose-400 uppercase tracking-widest text-center">{error}</p>
-                <button 
-                  onClick={getInsights}
-                  className="px-6 py-2 bg-rose-500 text-black text-[9px] font-black uppercase tracking-widest rounded-lg hover:bg-rose-400 transition-all"
-                >
-                  Retry Analysis
-                </button>
-              </div>
-            ) : null}
-
-            {!analysis && !loading && !error && (
-              <button 
-                onClick={getInsights}
-                className="w-full py-6 bg-zinc-900 hover:bg-zinc-800 text-white rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest border border-zinc-800 transition-all flex items-center justify-center gap-3 shadow-2xl shadow-emerald-500/5 shadow-indigo-500/10"
-              >
-                <Sparkles className="w-5 h-5 text-emerald-500" />
-                Analyze {starredSymbol} Bias
-              </button>
-            )}
-
-            {loading && (
-              <div className="flex flex-col items-center justify-center py-12 gap-4">
-                <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-                <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest animate-pulse">Computing Market Structure...</p>
-              </div>
-            )}
-
-            {analysis && (
-              <motion.div 
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="space-y-8"
-              >
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                   <div className="col-span-2 space-y-6">
-                      <div className="bg-zinc-900/40 p-8 rounded-3xl border border-zinc-900">
-                         <div className="flex items-center gap-2 mb-4">
-                            <span className={cn(
-                               "text-[10px] font-black uppercase px-2 py-0.5 rounded",
-                               analysis.sentiment === 'bullish' ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" : analysis.sentiment === 'bearish' ? "bg-rose-500/10 text-rose-400 border border-rose-500/20" : "bg-zinc-800 text-zinc-400 border border-zinc-700"
-                            )}>{analysis.sentiment}</span>
-                            <div className="h-px flex-1 bg-zinc-800" />
-                            <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">{analysis.confidence}% Confidence</span>
-                         </div>
-                         <p className="text-sm text-zinc-300 leading-relaxed font-medium italic">
-                            "{analysis.reasoning}"
-                         </p>
-                      </div>
-
-                      {analysis.key_levels && (
-                        <div className="grid grid-cols-3 gap-4">
-                          {analysis.key_levels.map((level, idx) => (
-                            <div key={idx} className="p-4 bg-black/40 border border-zinc-900 rounded-2xl">
-                               <div className="flex items-center justify-between mb-1.5">
-                                 <span className="text-[8px] font-black text-indigo-400 uppercase tracking-widest">{level.type}</span>
-                                 <TargetIcon className="w-3 h-3 text-zinc-700" />
-                               </div>
-                               <p className="text-lg font-black text-white tracking-tight leading-none mb-1">{level.price}</p>
-                               <p className="text-[8px] text-zinc-600 font-bold uppercase tracking-tight leading-tight">{level.rationale}</p>
-                            </div>
-                          ))}
-                        </div>
+                
+                <div className="space-y-4 relative z-10">
+                  <div className="flex items-center justify-between text-[8px] font-black uppercase tracking-widest text-zinc-500">
+                    <span>Confidence</span>
+                    <span>{analysis.confidence}%</span>
+                  </div>
+                  <div className="h-1.5 bg-zinc-900 rounded-full overflow-hidden border border-zinc-800">
+                    <motion.div 
+                      initial={{ width: 0 }}
+                      animate={{ width: `${analysis.confidence}%` }}
+                      className={cn(
+                        "h-full rounded-full transition-all duration-1000",
+                        analysis.bias === 'Bullish' ? "bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.4)]" : analysis.bias === 'Bearish' ? "bg-rose-500 shadow-[0_0_15px_rgba(244,63,94,0.4)]" : "bg-zinc-500"
                       )}
-                   </div>
+                    />
+                  </div>
+                  
+                  <div className="flex items-center gap-6 pt-4">
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[7px] font-black text-zinc-600 uppercase tracking-[0.2em]">Volatility</span>
+                      <span className="text-[10px] font-black text-white uppercase tracking-widest">{analysis.volatility}</span>
+                    </div>
+                    <div className="w-px h-6 bg-zinc-800" />
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[7px] font-black text-zinc-600 uppercase tracking-[0.2em]">Draw On Liq</span>
+                      <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">{analysis.drawOnLiquidity}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
 
-                   <div className="col-span-1 bg-black/40 p-8 rounded-3xl border border-zinc-900 flex flex-col justify-center">
-                      <h4 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-6">Prediction Market</h4>
-                      <div className="space-y-4">
-                         {Object.entries(analysis.probabilities).map(([key, val]) => (
-                            <div key={key} className="space-y-1.5">
-                               <div className="flex items-center justify-between text-[8px] font-black uppercase tracking-widest text-zinc-500">
-                                  <span>{key}</span>
-                                  <span>{val}%</span>
-                               </div>
-                               <div className="h-1.5 bg-zinc-900 rounded-full overflow-hidden">
-                                  <motion.div 
-                                     initial={{ width: 0 }}
-                                     animate={{ width: `${val}%` }}
-                                     className={cn(
-                                        "h-full rounded-full",
-                                        key === 'bullish' ? "bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]" : key === 'bearish' ? "bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.3)]" : "bg-zinc-500"
-                                     )}
-                                  />
-                               </div>
-                            </div>
-                         ))}
+            {/* Context & Targets */}
+            <div className="lg:col-span-8 space-y-6">
+              <div className="bg-zinc-950 p-8 md:p-10 rounded-[2.5rem] border border-zinc-900 h-full">
+                <div className="mb-10">
+                  <h4 className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em] mb-4">NY Open Strategic Context</h4>
+                  <p className="text-sm md:text-md text-white font-medium italic leading-relaxed opacity-90">"{analysis.openContext}"</p>
+                </div>
+
+                <div className="space-y-4">
+                  <h4 className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em] mb-4">Session Target Levels</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {analysis.targets.map((target, idx) => (
+                      <div key={idx} className="p-5 bg-black/40 border border-zinc-900 rounded-3xl hover:border-indigo-500/30 transition-all group/target">
+                        <div className="flex items-center justify-between mb-2">
+                           <span className={cn(
+                             "text-[7px] px-2 py-0.5 rounded font-black uppercase tracking-widest",
+                             target.type === 'Profit' ? 'bg-emerald-500/10 text-emerald-500' : target.type === 'Stop' ? 'bg-rose-500/10 text-rose-500' : 'bg-indigo-500/10 text-indigo-500'
+                           )}>
+                             {target.type}
+                           </span>
+                           <span className="text-[11px] font-black text-white tabular-nums tracking-tight">{target.price}</span>
+                        </div>
+                        <p className="text-[8px] text-zinc-500 font-bold uppercase leading-relaxed tracking-wider group-hover/target:text-zinc-400 transition-colors">
+                          {target.rationale}
+                        </p>
                       </div>
-                   </div>
+                    ))}
+                  </div>
                 </div>
-
-                <div className="flex items-center justify-between pt-6 border-t border-zinc-900">
-                  <p className="text-[9px] text-zinc-600 font-black uppercase tracking-widest">Source: Gemini 3 High-Fidelity Focus</p>
-                  <button 
-                    onClick={getInsights}
-                    className="text-[10px] text-zinc-500 hover:text-white uppercase font-black tracking-widest transition-colors flex items-center gap-1.5 group"
-                  >
-                    <RotateCw className="w-3 h-3 group-hover:rotate-180 transition-transform duration-500" />
-                    Re-Analyze Focus
-                  </button>
-                </div>
-              </motion.div>
-            )}
+              </div>
+            </div>
           </div>
-        )}
+        ) : null}
+        
+        {/* Market Status Bar */}
+        <div className="mt-12 flex flex-col sm:flex-row items-center justify-between gap-4 pt-8 border-t border-zinc-900/50">
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-2">
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-[8px] font-black text-zinc-500 uppercase tracking-[0.2em]">NY Open Matrix Sync: V2.14</span>
+            </div>
+            <div className="hidden sm:flex items-center gap-2">
+              <Clock className="w-3 h-3 text-zinc-700" />
+              <span className="text-[8px] font-black text-zinc-600 uppercase tracking-[0.2em]">09:30 EST WINDOW ACTIVE</span>
+            </div>
+          </div>
+          <p className="text-[8px] font-black text-zinc-700 uppercase tracking-[0.3em] italic">Institutional Order-Flow Analysis Platform</p>
+        </div>
       </div>
     </div>
   );
@@ -6193,13 +6408,26 @@ const Markets = () => {
         </AnimatePresence>
       </div>
 
-      <AIInsights starredSymbol={starredSymbol} />
+      <NYCOpenBiasAnalyst starredSymbol={starredSymbol} />
     </motion.div>
   );
 };
 
-const Execution = ({ trades, onUpdateTrade, currency, hidePnL, user }: { trades: Trade[], onUpdateTrade: (id: string, updates: Partial<Trade>) => void, currency: string, hidePnL: boolean, user: User | null }) => {
-  const [selectedTradeId, setSelectedTradeId] = useState<string | null>(trades[0]?.id || null);
+const Execution = ({ trades, onUpdateTrade, currency, hidePnL, user, initialTradeId }: { 
+  trades: Trade[], 
+  onUpdateTrade: (id: string, updates: Partial<Trade>) => void, 
+  currency: string, 
+  hidePnL: boolean, 
+  user: User | null,
+  initialTradeId?: string | null
+}) => {
+  const [selectedTradeId, setSelectedTradeId] = useState<string | null>(initialTradeId || trades[0]?.id || null);
+  
+  useEffect(() => {
+    if (initialTradeId) {
+      setSelectedTradeId(initialTradeId);
+    }
+  }, [initialTradeId]);
   const selectedTrade = trades.find(t => t.id === selectedTradeId);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -6521,6 +6749,7 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(true);
   const [dataLoading, setDataLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [selectedExecutionId, setSelectedExecutionId] = useState<string | null>(null);
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -7135,6 +7364,10 @@ export default function App() {
                     user={user}
                     onUpdateTrade={handleUpdateTrade}
                     startingBalance={settings.startingBalance}
+                    onSelectExecution={(id) => {
+                      setSelectedExecutionId(id);
+                      setActiveTab('execution');
+                    }}
                   />
                 )}
                 {activeTab === 'journal' && (
@@ -7148,7 +7381,16 @@ export default function App() {
                     user={user}
                   />
                 )}
-                {activeTab === 'execution' && <Execution trades={sortedTrades} onUpdateTrade={handleUpdateTrade} currency={settings.currency} hidePnL={settings.hidePnL} user={user} />}
+                {activeTab === 'execution' && (
+                  <Execution 
+                    trades={sortedTrades} 
+                    onUpdateTrade={handleUpdateTrade} 
+                    currency={settings.currency} 
+                    hidePnL={settings.hidePnL} 
+                    user={user} 
+                    initialTradeId={selectedExecutionId}
+                  />
+                )}
                 {activeTab === 'markets' && <Markets />}
                 {activeTab === 'economic' && <EconomicCalendar />}
                 {activeTab === 'plan' && (
