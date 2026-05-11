@@ -31,6 +31,8 @@ import {
   ChevronLeft,
   Filter,
   Calendar,
+  Camera,
+  Download,
   Maximize,
   ChevronDown,
   ChevronUp,
@@ -161,6 +163,7 @@ import {
   addMonths,
   subMonths,
   isWithinInterval,
+  isSameMonth,
   startOfYear
 } from 'date-fns';
 import { cn, formatCurrency, formatPercent } from './lib/utils';
@@ -1514,9 +1517,39 @@ const JournalSlideshow = ({ trades, onSelectTrade }: { trades: Trade[], onSelect
   );
 };
 
-const PnLCalendar = ({ trades, setSelectedTrade, currency, hidePnL }: { trades: Trade[], setSelectedTrade: (t: Trade) => void, currency: string, hidePnL: boolean }) => {
+const PnLCalendar = ({ trades, setSelectedTrade, currency, hidePnL, profileName }: { trades: Trade[], setSelectedTrade: (t: Trade) => void, currency: string, hidePnL: boolean, profileName: string }) => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  const calendarRef = useRef<HTMLDivElement>(null);
+  const [isCapturing, setIsCapturing] = useState(false);
   
+  const handleCapture = async () => {
+    if (!calendarRef.current) return;
+    
+    try {
+      setIsCapturing(true);
+      // Small delay to ensure styles are applied and loading states settled
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      const dataUrl = await toPng(calendarRef.current, {
+        cacheBust: true,
+        backgroundColor: '#09090b', // zinc-950 equivalent for clean screenshot
+        style: {
+          borderRadius: '16px',
+          padding: '20px' // Add padding for the screenshot
+        }
+      });
+      
+      const link = document.createElement('a');
+      link.download = `zync-pnl-calendar-${format(currentMonth, 'MMMM-yyyy').toLowerCase()}.png`;
+      link.href = dataUrl;
+      link.click();
+    } catch (err) {
+      console.error('Failed to capture calendar:', err);
+    } finally {
+      setIsCapturing(false);
+    }
+  };
+
   const displayValue = (val: number, showSign: boolean = false) => {
     if (hidePnL) return '***';
     const sign = showSign && val > 0 ? '+' : '';
@@ -1533,86 +1566,186 @@ const PnLCalendar = ({ trades, setSelectedTrade, currency, hidePnL }: { trades: 
   const nextMonth = () => setCurrentMonth(addMonths(currentMonth, 1));
   const prevMonth = () => setCurrentMonth(subMonths(currentMonth, 1));
 
+  // Analytics for the month
+  const monthTrades = (trades || []).filter(t => isSameMonth(parseISO(t.exitDate), currentMonth));
+  const monthPnL = monthTrades.reduce((acc, t) => acc + t.pnl, 0);
+  const monthWins = monthTrades.filter(t => t.pnl > 0).length;
+  const monthWinRate = monthTrades.length > 0 ? (monthWins / monthTrades.length) * 100 : 0;
+
+  // Weekly P&L grouping
+  const weeks = [];
+  for (let i = 0; i < calendarDays.length; i += 7) {
+    weeks.push(calendarDays.slice(i, i + 7));
+  }
+
+  const weeklyPnL = weeks.map(week => {
+    const weekTrades = (trades || []).filter(t => week.some(day => isSameDay(parseISO(t.exitDate), day)));
+    return weekTrades.reduce((acc, t) => acc + t.pnl, 0);
+  });
+
   return (
-    <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden shadow-2xl min-w-[700px]">
-      <div className="px-6 py-5 border-b border-zinc-800 flex items-center justify-between bg-zinc-900/50">
-        <div className="flex items-center gap-4">
-          <h3 className="text-sm font-black text-white uppercase tracking-widest">{format(currentMonth, 'MMMM yyyy')}</h3>
-          <div className="flex gap-1">
-            <button onClick={prevMonth} className="p-1 hover:bg-zinc-800 rounded-lg text-zinc-400 transition-colors">
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <button onClick={nextMonth} className="p-1 hover:bg-zinc-800 rounded-lg text-zinc-400 transition-colors">
-              <ChevronRight className="w-4 h-4" />
-            </button>
+    <div ref={calendarRef} className="bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden shadow-2xl min-w-[800px] flex flex-col">
+      {/* Enhanced Header for Snapshot */}
+      <div className="px-8 py-6 border-b border-zinc-800 flex items-center justify-between bg-zinc-900/80 backdrop-blur-xl">
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-3">
+             <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center">
+                <Calendar className="w-4 h-4 text-emerald-500" />
+             </div>
+             <div>
+                <h4 className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.3em] leading-none mb-1">Trading Log</h4>
+                <h3 className="text-xl font-black text-white uppercase tracking-tighter leading-none">{profileName}</h3>
+             </div>
           </div>
         </div>
-        <div className="text-[10px] text-zinc-500 uppercase font-black tracking-[0.2em]">P&L Calendar</div>
-      </div>
 
-      <div className="grid grid-cols-7 border-b border-zinc-800">
-        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-          <div key={day} className="py-3 text-center text-[10px] font-black text-zinc-600 uppercase tracking-widest bg-zinc-950/50">
-            {day}
+        <div className="flex items-center gap-8">
+          <div className="text-right">
+             <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest leading-none mb-1">Month Performance</p>
+             <p className={cn("text-xl font-black tabular-nums leading-none", monthPnL >= 0 ? "text-emerald-400" : "text-rose-400")}>
+                {monthPnL >= 0 ? '+' : ''}{displayValue(monthPnL)}
+             </p>
           </div>
-        ))}
-      </div>
+          
+          <div className="h-10 w-px bg-zinc-800 hidden md:block" />
 
-      <div className="grid grid-cols-7">
-        {calendarDays.map((day, idx) => {
-          const dayTrades = (trades || []).filter(t => isSameDay(parseISO(t.exitDate), day));
-          const dayPnL = dayTrades.reduce((acc, t) => acc + t.pnl, 0);
-          const isCurrentMonth = isSameDay(startOfMonth(day), startOfMonth(currentMonth));
-          const isToday = isSameDay(day, new Date());
-
-          return (
-            <div 
-              key={idx} 
-              className={cn(
-                "min-h-[120px] p-2 border-r border-b border-zinc-800 transition-colors flex flex-col",
-                !isCurrentMonth ? "bg-zinc-950/20 opacity-30" : "bg-zinc-900/20",
-                isToday && "bg-indigo-500/5"
-              )}
-            >
-              <div className="flex justify-between items-start mb-2">
-                <span className={cn(
-                  "text-[10px] font-black",
-                  isToday ? "text-indigo-400" : "text-zinc-600"
-                )}>
-                  {format(day, 'd')}
-                </span>
-                {dayPnL !== 0 && (
-                  <span className={cn(
-                    "text-[10px] font-bold",
-                    dayPnL > 0 ? "text-emerald-400" : "text-rose-400"
-                  )}>
-                    {dayPnL > 0 ? '+' : ''}{displayValue(dayPnL)}
-                  </span>
-                )}
-              </div>
-              
-              <div className="space-y-1 flex-1 overflow-y-auto custom-scrollbar pr-1">
-                {dayTrades.map(trade => (
-                  <button
-                    key={trade.id}
-                    onClick={() => setSelectedTrade(trade)}
-                    className={cn(
-                      "w-full text-left p-1.5 rounded-md text-[9px] font-bold border transition-all hover:scale-[1.02] active:scale-[0.98]",
-                      trade.pnl >= 0 
-                        ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" 
-                        : "bg-rose-500/10 border-rose-500/20 text-rose-400"
-                    )}
-                  >
-                    <div className="flex justify-between items-center">
-                      <span className="truncate">{trade.asset}</span>
-                      <span>{displayValue(trade.pnl, true)}</span>
-                    </div>
-                  </button>
-                ))}
+          <div className="flex items-center md:items-end flex-col gap-2">
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={handleCapture}
+                disabled={isCapturing}
+                className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-black rounded-xl transition-all text-[10px] font-black uppercase tracking-widest disabled:opacity-50 hover:scale-105 active:scale-95 shadow-lg shadow-emerald-500/20"
+              >
+                {isCapturing ? <Sparkles className="w-3 h-3 animate-spin" /> : <Camera className="w-3 h-3" />}
+                {isCapturing ? 'Snapping...' : 'Snap P&L'}
+              </button>
+              <div className="flex gap-1">
+                <button onClick={prevMonth} className="p-2 hover:bg-zinc-800 rounded-xl text-zinc-400 transition-colors border border-zinc-800">
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <button onClick={nextMonth} className="p-2 hover:bg-zinc-800 rounded-xl text-zinc-400 transition-colors border border-zinc-800">
+                  <ChevronRight className="w-4 h-4" />
+                </button>
               </div>
             </div>
-          );
-        })}
+            <p className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.25em]">{format(currentMonth, 'MMMM yyyy')}</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex flex-1">
+        <div className="flex-1">
+          <div className="grid grid-cols-7 border-b border-zinc-800">
+            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+              <div key={day} className="py-4 text-center text-[10px] font-black text-zinc-600 uppercase tracking-widest bg-zinc-950/50">
+                {day}
+              </div>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-7">
+            {calendarDays.map((day, idx) => {
+              const dayTrades = (trades || []).filter(t => isSameDay(parseISO(t.exitDate), day));
+              const dayPnL = dayTrades.reduce((acc, t) => acc + t.pnl, 0);
+              const isCurrentMonth = isSameDay(startOfMonth(day), startOfMonth(currentMonth));
+              const isToday = isSameDay(day, new Date());
+
+              return (
+                <div 
+                  key={idx} 
+                  className={cn(
+                    "min-h-[140px] p-2 border-r border-b border-zinc-800 transition-colors flex flex-col group/day",
+                    !isCurrentMonth ? "bg-zinc-950/20 opacity-30" : "bg-zinc-900/20",
+                    isToday && "bg-emerald-500/5 ring-1 ring-inset ring-emerald-500/20"
+                  )}
+                >
+                  <div className="flex justify-between items-start mb-2">
+                    <span className={cn(
+                      "text-[10px] font-black px-1.5 py-0.5 rounded-md",
+                      isToday ? "bg-emerald-500 text-black" : (!isCurrentMonth ? "text-zinc-700" : "text-zinc-600")
+                    )}>
+                      {format(day, 'd')}
+                    </span>
+                    {dayPnL !== 0 && (
+                      <span className={cn(
+                        "text-[10px] font-bold tabular-nums",
+                        dayPnL > 0 ? "text-emerald-400" : "text-rose-400"
+                      )}>
+                        {dayPnL > 0 ? '+' : ''}{displayValue(dayPnL)}
+                      </span>
+                    )}
+                  </div>
+                  
+                  <div className="space-y-1 flex-1 overflow-y-auto custom-scrollbar pr-1">
+                    {dayTrades.map(trade => (
+                      <button
+                        key={trade.id}
+                        onClick={() => setSelectedTrade(trade)}
+                        className={cn(
+                          "w-full text-left p-2 rounded-lg text-[9px] font-bold border transition-all hover:scale-[1.05] active:scale-[0.98] shadow-sm",
+                          trade.pnl >= 0 
+                            ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20" 
+                            : "bg-rose-500/10 border-rose-500/20 text-rose-400 hover:bg-rose-500/20"
+                        )}
+                      >
+                        <div className="flex justify-between items-center">
+                          <span className="truncate max-w-[50px]">{trade.asset}</span>
+                          <span className="tabular-nums">{displayValue(trade.pnl, true)}</span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Weekly P&L Column */}
+        <div className="w-24 bg-zinc-950/50 border-l border-zinc-800 flex flex-col">
+          <div className="py-4 text-center text-[10px] font-black text-zinc-600 uppercase tracking-widest bg-zinc-950/80 border-b border-zinc-800">
+            Weekly
+          </div>
+          <div className="flex-1 flex flex-col justify-around">
+            {weeklyPnL.map((pnl, idx) => (
+              <div key={idx} className="flex-1 flex flex-col items-center justify-center border-b border-zinc-800 p-2 text-center group/week hover:bg-zinc-800/20 transition-colors">
+                <span className="text-[8px] font-black text-zinc-700 uppercase tracking-widest mb-1 group-hover/week:text-zinc-500 transition-colors">Week {idx + 1}</span>
+                <span className={cn(
+                  "text-[10px] font-black tabular-nums",
+                  pnl > 0 ? "text-emerald-400" : (pnl < 0 ? "text-rose-400" : "text-zinc-600")
+                )}>
+                  {pnl !== 0 ? (pnl > 0 ? '+' : '') + displayValue(pnl) : '—'}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Footer for Win Rate and Month Stats */}
+      <div className="bg-zinc-950/80 px-8 py-5 flex items-center justify-between border-t border-zinc-800">
+        <div className="flex items-center gap-12">
+           <div className="flex items-center gap-4">
+              <div className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_10px_rgba(16,185,129,0.5)]" />
+              <div>
+                 <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Monthly Edge</p>
+                 <p className="text-sm font-black text-white tabular-nums tracking-tighter">{monthWinRate.toFixed(1)}% Winrate</p>
+              </div>
+           </div>
+           
+           <div className="h-8 w-px bg-zinc-800" />
+           
+           <div className="flex items-center gap-4">
+              <div>
+                 <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Total Trades</p>
+                 <p className="text-sm font-black text-white tabular-nums tracking-tighter">{monthTrades.length} Positions</p>
+              </div>
+           </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+           <span className="text-[9px] font-black text-zinc-700 uppercase tracking-[0.4em]">Powered by ZYNC Intelligence</span>
+        </div>
       </div>
     </div>
   );
@@ -1983,7 +2116,7 @@ const TradeJournal = ({ trades, onAddTrade, onUpdateTrade, onDeleteTrade, settin
               transition={{ duration: 0.2 }}
               className="overflow-x-auto custom-scrollbar"
             >
-              <PnLCalendar trades={filteredTrades} setSelectedTrade={setSelectedTrade} currency={currency} hidePnL={hidePnL} />
+              <PnLCalendar trades={filteredTrades} setSelectedTrade={setSelectedTrade} currency={currency} hidePnL={hidePnL} profileName={settings.profileName} />
             </motion.div>
           )}
         </AnimatePresence>
@@ -3265,7 +3398,7 @@ const Analytics = ({ trades, currency, hidePnL, user, profileName, onUpdateTrade
 
       {/* Analytics Footer with Quotes */}
       <ScrollAnimatedSection delay={0.2} className="bg-zinc-900 border border-zinc-800 rounded-3xl overflow-hidden mb-12">
-        <PnLCalendar trades={trades} setSelectedTrade={setSelectedTrade} currency={currency} hidePnL={hidePnL} />
+        <PnLCalendar trades={trades} setSelectedTrade={setSelectedTrade} currency={currency} hidePnL={hidePnL} profileName={profileName} />
       </ScrollAnimatedSection>
 
       <AnimatePresence>
