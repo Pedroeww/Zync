@@ -1520,27 +1520,30 @@ const JournalSlideshow = ({ trades, onSelectTrade }: { trades: Trade[], onSelect
 const PnLCalendar = ({ trades, setSelectedTrade, currency, hidePnL, profileName }: { trades: Trade[], setSelectedTrade: (t: Trade) => void, currency: string, hidePnL: boolean, profileName: string }) => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const calendarRef = useRef<HTMLDivElement>(null);
+  const posterRef = useRef<HTMLDivElement>(null);
   const [isCapturing, setIsCapturing] = useState(false);
+  const [captureOrientation, setCaptureOrientation] = useState<'portrait' | 'landscape'>('landscape');
   
-  const handleCapture = async () => {
-    if (!calendarRef.current) return;
+  const handleCapture = async (orientation: 'portrait' | 'landscape') => {
+    setCaptureOrientation(orientation);
+    // Small delay to ensure state update and DOM preparation
+    setIsCapturing(true);
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    if (!posterRef.current) {
+      setIsCapturing(false);
+      return;
+    }
     
     try {
-      setIsCapturing(true);
-      // Small delay to ensure styles are applied and loading states settled
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      const dataUrl = await toPng(calendarRef.current, {
+      const dataUrl = await toPng(posterRef.current, {
         cacheBust: true,
-        backgroundColor: '#09090b', // zinc-950 equivalent for clean screenshot
-        style: {
-          borderRadius: '16px',
-          padding: '20px' // Add padding for the screenshot
-        }
+        width: orientation === 'portrait' ? 1080 : 1920,
+        height: orientation === 'portrait' ? 1350 : 1080,
       });
       
       const link = document.createElement('a');
-      link.download = `zync-pnl-calendar-${format(currentMonth, 'MMMM-yyyy').toLowerCase()}.png`;
+      link.download = `zync-pnl-calendar-${format(currentMonth, 'MMMM-yyyy').toLowerCase()}-${orientation}.png`;
       link.href = dataUrl;
       link.click();
     } catch (err) {
@@ -1611,14 +1614,24 @@ const PnLCalendar = ({ trades, setSelectedTrade, currency, hidePnL, profileName 
 
           <div className="flex items-center md:items-end flex-col gap-2">
             <div className="flex items-center gap-2">
-              <button 
-                onClick={handleCapture}
-                disabled={isCapturing}
-                className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-black rounded-xl transition-all text-[10px] font-black uppercase tracking-widest disabled:opacity-50 hover:scale-105 active:scale-95 shadow-lg shadow-emerald-500/20"
-              >
-                {isCapturing ? <Sparkles className="w-3 h-3 animate-spin" /> : <Camera className="w-3 h-3" />}
-                {isCapturing ? 'Snapping...' : 'Snap P&L'}
-              </button>
+              <div className="flex gap-1">
+                <button 
+                  onClick={() => handleCapture('portrait')}
+                  disabled={isCapturing}
+                  className="flex items-center gap-2 px-3 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 rounded-xl border border-emerald-500/20 transition-all text-[9px] font-black uppercase tracking-widest disabled:opacity-50"
+                >
+                  <Camera className="w-3 h-3" />
+                  Portrait
+                </button>
+                <button 
+                  onClick={() => handleCapture('landscape')}
+                  disabled={isCapturing}
+                  className="flex items-center gap-2 px-3 py-2 bg-emerald-500 text-black rounded-xl border border-emerald-500/20 transition-all text-[9px] font-black uppercase tracking-widest disabled:opacity-50"
+                >
+                  <Camera className="w-3 h-3" />
+                  Landscape
+                </button>
+              </div>
               <div className="flex gap-1">
                 <button onClick={prevMonth} className="p-2 hover:bg-zinc-800 rounded-xl text-zinc-400 transition-colors border border-zinc-800">
                   <ChevronLeft className="w-4 h-4" />
@@ -1745,6 +1758,148 @@ const PnLCalendar = ({ trades, setSelectedTrade, currency, hidePnL, profileName 
 
         <div className="flex items-center gap-2">
            <span className="text-[9px] font-black text-zinc-700 uppercase tracking-[0.4em]">Powered by ZYNC Intelligence</span>
+        </div>
+      </div>
+
+      {/* Hidden Poster Target for Snapshot */}
+      <div className="fixed left-[-9999px] top-0 pointer-events-none">
+        <div 
+          ref={posterRef}
+          style={{ 
+            width: captureOrientation === 'portrait' ? '1080px' : '1920px', 
+            height: captureOrientation === 'portrait' ? '1350px' : '1080px' 
+          }}
+          className="bg-black flex flex-col p-16 relative overflow-hidden text-white font-sans border-[16px] border-zinc-900"
+        >
+          {/* Decorative elements */}
+          <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-emerald-500/10 blur-[200px] rounded-full -mr-96 -mt-96" />
+          <div className="absolute bottom-0 left-0 w-[800px] h-[800px] bg-indigo-500/10 blur-[200px] rounded-full -ml-96 -mb-96" />
+          
+          {/* Poster Header */}
+          <div className="flex justify-between items-start relative z-10 mb-12">
+            <div className="space-y-1">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 bg-emerald-500 rounded-2xl flex items-center justify-center font-black text-3xl text-black">Z</div>
+                <div>
+                   <h2 className="text-4xl font-black tracking-tighter">ZYNC</h2>
+                   <p className="text-zinc-600 text-[10px] font-black uppercase tracking-[0.4em]">Intelligence Pro</p>
+                </div>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-zinc-600 text-[10px] font-black uppercase tracking-[0.3em]">Monthly Pulse</p>
+              <p className="text-2xl font-black text-zinc-300">{format(currentMonth, 'MMMM yyyy')}</p>
+            </div>
+          </div>
+
+          <div className={cn(
+            "flex relative z-10 gap-12",
+            captureOrientation === 'portrait' ? "flex-col" : "flex-row items-center"
+          )}>
+            <div className={cn(
+              "space-y-2",
+              captureOrientation === 'portrait' ? "mb-12" : "flex-1"
+            )}>
+              <p className="text-zinc-600 font-black uppercase tracking-[0.5em] text-xs">Portfolio Holder</p>
+              <h1 className={cn(
+                "font-black tracking-tighter leading-tight",
+                captureOrientation === 'portrait' ? "text-7xl" : "text-8xl"
+              )}>
+                {profileName}
+              </h1>
+              <div className="h-2 w-32 bg-emerald-500 rounded-full" />
+            </div>
+
+            <div className={cn(
+              "grid gap-8",
+              captureOrientation === 'portrait' ? "grid-cols-2" : "grid-cols-2 w-1/3"
+            )}>
+              <div className="p-8 bg-zinc-900 border border-zinc-800 rounded-[2rem]">
+                <p className="text-zinc-600 font-black uppercase tracking-[0.3em] text-[10px] mb-3">Net Profit</p>
+                <p className={cn("text-4xl font-black tabular-nums tracking-tighter", monthPnL >= 0 ? "text-emerald-400" : "text-rose-400")}>
+                  {monthPnL >= 0 ? '+' : ''}{displayValue(monthPnL)}
+                </p>
+              </div>
+              <div className="p-8 bg-zinc-900 border border-zinc-800 rounded-[2rem]">
+                <p className="text-zinc-600 font-black uppercase tracking-[0.3em] text-[10px] mb-3">Efficiency</p>
+                <p className="text-4xl font-black text-white tabular-nums tracking-tighter">
+                  {monthWinRate.toFixed(1)}%
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Main Content: Calendar Grid */}
+          <div className="mt-12 flex-1 relative z-10 flex gap-6">
+            <div className="flex-1 bg-zinc-900/50 border border-zinc-800 rounded-[2.5rem] overflow-hidden flex flex-col p-1 shadow-2xl">
+              <div className="grid grid-cols-7 border-b border-zinc-800">
+                {['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'].map(day => (
+                  <div key={day} className="py-5 text-center text-[10px] font-black text-zinc-700 uppercase tracking-widest bg-zinc-950/30">
+                    {day}
+                  </div>
+                ))}
+              </div>
+              <div className="grid grid-cols-7 flex-1">
+                {calendarDays.map((day, idx) => {
+                  const dayTrades = (trades || []).filter(t => isSameDay(parseISO(t.exitDate), day));
+                  const dayPnL = dayTrades.reduce((acc, t) => acc + t.pnl, 0);
+                  const isCurMonth = isSameMonth(day, currentMonth);
+                  
+                  return (
+                    <div key={idx} className={cn(
+                      "p-3 border-r border-b border-zinc-800/50 flex flex-col min-h-[100px]",
+                      !isCurMonth && "opacity-20 bg-zinc-950/20"
+                    )}>
+                      <span className="text-[10px] font-black text-zinc-700 mb-1">{format(day, 'd')}</span>
+                      {dayPnL !== 0 && (
+                        <div className={cn(
+                          "mt-auto text-xs font-black tabular-nums",
+                          dayPnL > 0 ? "text-emerald-400" : "text-rose-400"
+                        )}>
+                          {dayPnL > 0 ? '+' : ''}{displayValue(dayPnL)}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Weekly Breakdown on Right */}
+            <div className="w-48 flex flex-col gap-4">
+              <div className="p-6 bg-zinc-900 border border-zinc-800 rounded-[2rem] flex-1 flex flex-col shadow-xl">
+                 <p className="text-zinc-600 font-black uppercase tracking-[0.3em] text-[10px] mb-6 text-center border-b border-zinc-800 pb-4">Weekly Net</p>
+                 <div className="flex-1 flex flex-col justify-around">
+                    {weeklyPnL.map((pnl, idx) => (
+                      <div key={idx} className="text-center py-2">
+                        <p className="text-[8px] font-black text-zinc-700 uppercase tracking-widest mb-1">Week {idx + 1}</p>
+                        <p className={cn("text-sm font-black tabular-nums", pnl > 0 ? "text-emerald-400" : (pnl < 0 ? "text-rose-400" : "text-zinc-800"))}>
+                          {pnl !== 0 ? (pnl > 0 ? '+' : '') + displayValue(pnl) : '—'}
+                        </p>
+                      </div>
+                    ))}
+                 </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="mt-12 pt-12 border-t border-zinc-900 flex justify-between items-end relative z-10">
+            <div className="max-w-md">
+              <p className="text-zinc-500 text-xs leading-relaxed font-medium">
+                This performance snapshot was generated by <span className="text-white font-bold">ZYNC</span> — the professional toolkit for modern market speculators. Tracking {monthTrades.length} positions in {format(currentMonth, 'MMMM')}.
+              </p>
+            </div>
+            <div className="text-right">
+              <p className="text-zinc-700 font-black uppercase tracking-[0.4em] text-[10px] mb-2">zync.intelligence</p>
+              <div className="flex items-center gap-3 justify-end">
+                <div className="w-10 h-1 px-1 bg-zinc-900 rounded-full flex items-center">
+                   <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${monthWinRate}%` }} />
+                </div>
+                <span className="text-[10px] font-black text-zinc-400">{monthWinRate.toFixed(1)}% WR</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
