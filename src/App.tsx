@@ -1674,14 +1674,14 @@ const PnLCalendar = ({ trades, setSelectedTrade, currency, hidePnL, profileName 
                 >
                   <div className="flex justify-between items-start mb-2">
                     <span className={cn(
-                      "text-[10px] font-black px-1.5 py-0.5 rounded-md",
+                      "text-xs font-black px-1.5 py-0.5 rounded-md",
                       isToday ? "bg-emerald-500 text-black" : (!isCurrentMonth ? "text-zinc-700" : "text-zinc-600")
                     )}>
                       {format(day, 'd')}
                     </span>
                     {dayPnL !== 0 && (
                       <span className={cn(
-                        "text-[10px] font-bold tabular-nums",
+                        "text-xs font-bold tabular-nums",
                         dayPnL > 0 ? "text-emerald-400" : "text-rose-400"
                       )}>
                         {dayPnL > 0 ? '+' : ''}{displayValue(dayPnL)}
@@ -1724,7 +1724,7 @@ const PnLCalendar = ({ trades, setSelectedTrade, currency, hidePnL, profileName 
               <div key={idx} className="flex-1 flex flex-col items-center justify-center border-b border-zinc-800 p-2 text-center group/week hover:bg-zinc-800/20 transition-colors">
                 <span className="text-[8px] font-black text-zinc-700 uppercase tracking-widest mb-1 group-hover/week:text-zinc-500 transition-colors">Week {idx + 1}</span>
                 <span className={cn(
-                  "text-[10px] font-black tabular-nums",
+                  "text-xs font-black tabular-nums",
                   pnl > 0 ? "text-emerald-400" : (pnl < 0 ? "text-rose-400" : "text-zinc-600")
                 )}>
                   {pnl !== 0 ? (pnl > 0 ? '+' : '') + displayValue(pnl) : '—'}
@@ -1781,14 +1781,14 @@ const PnLCalendar = ({ trades, setSelectedTrade, currency, hidePnL, profileName 
               <div className="flex items-center gap-4">
                 <div className="w-14 h-14 bg-emerald-500 rounded-2xl flex items-center justify-center font-black text-3xl text-black">Z</div>
                 <div>
-                   <h2 className="text-5xl font-black tracking-tighter">ZYNC</h2>
-                   <p className="text-zinc-600 text-[14px] font-black uppercase tracking-[0.4em]">Intelligence Pro</p>
+                   <h2 className="text-4xl font-black tracking-tighter">ZYNC</h2>
+                   <p className="text-zinc-600 text-[10px] font-black uppercase tracking-[0.4em]">Intelligence Pro</p>
                 </div>
               </div>
             </div>
             <div className="text-right">
-              <p className="text-zinc-600 text-[14px] font-black uppercase tracking-[0.3em]">Monthly Pulse</p>
-              <p className="text-3xl font-black text-zinc-300">{format(currentMonth, 'MMMM yyyy')}</p>
+              <p className="text-zinc-600 text-[10px] font-black uppercase tracking-[0.3em]">Monthly Pulse</p>
+              <p className="text-2xl font-black text-zinc-300">{format(currentMonth, 'MMMM yyyy')}</p>
             </div>
           </div>
 
@@ -1800,10 +1800,10 @@ const PnLCalendar = ({ trades, setSelectedTrade, currency, hidePnL, profileName 
               "space-y-2",
               captureOrientation === 'portrait' ? "mb-12" : "flex-1"
             )}>
-              <p className="text-zinc-600 font-black uppercase tracking-[0.5em] text-base">Portfolio Holder</p>
+              <p className="text-zinc-600 font-black uppercase tracking-[0.5em] text-xs">Portfolio Holder</p>
               <h1 className={cn(
                 "font-black tracking-tighter leading-tight",
-                captureOrientation === 'portrait' ? "text-8xl" : "text-9xl"
+                captureOrientation === 'portrait' ? "text-7xl" : "text-8xl"
               )}>
                 {profileName}
               </h1>
@@ -1815,14 +1815,14 @@ const PnLCalendar = ({ trades, setSelectedTrade, currency, hidePnL, profileName 
               captureOrientation === 'portrait' ? "grid-cols-2" : "grid-cols-2 w-1/3"
             )}>
               <div className="p-8 bg-zinc-900 border border-zinc-800 rounded-[2rem]">
-                <p className="text-zinc-600 font-black uppercase tracking-[0.3em] text-[16px] mb-3">Net Profit</p>
-                <p className={cn("text-[82px] font-black tabular-nums tracking-tighter", monthPnL >= 0 ? "text-emerald-400" : "text-rose-400")}>
+                <p className="text-zinc-600 font-black uppercase tracking-[0.3em] text-[10px] mb-3">Net Profit</p>
+                <p className={cn("text-4xl font-black tabular-nums tracking-tighter", monthPnL >= 0 ? "text-emerald-400" : "text-rose-400")}>
                   {monthPnL >= 0 ? '+' : ''}{displayValue(monthPnL)}
                 </p>
               </div>
               <div className="p-8 bg-zinc-900 border border-zinc-800 rounded-[2rem]">
-                <p className="text-zinc-600 font-black uppercase tracking-[0.3em] text-[16px] mb-3">Efficiency</p>
-                <p className="text-6xl font-black text-white tabular-nums tracking-tighter">
+                <p className="text-zinc-600 font-black uppercase tracking-[0.3em] text-[10px] mb-3">Efficiency</p>
+                <p className="text-4xl font-black text-white tabular-nums tracking-tighter">
                   {monthWinRate.toFixed(1)}%
                 </p>
               </div>
@@ -1834,7 +1834,7 @@ const PnLCalendar = ({ trades, setSelectedTrade, currency, hidePnL, profileName 
             <div className="flex-1 bg-zinc-900/50 border border-zinc-800 rounded-[2.5rem] overflow-hidden flex flex-col p-1 shadow-2xl">
               <div className="grid grid-cols-7 border-b border-zinc-800">
                 {['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'].map(day => (
-                  <div key={day} className="py-5 text-center text-[16px] font-black text-zinc-700 uppercase tracking-widest bg-zinc-950/30">
+                  <div key={day} className="py-5 text-center text-[10px] font-black text-zinc-700 uppercase tracking-widest bg-zinc-950/30">
                     {day}
                   </div>
                 ))}
@@ -1850,10 +1850,10 @@ const PnLCalendar = ({ trades, setSelectedTrade, currency, hidePnL, profileName 
                       "p-3 border-r border-b border-zinc-800/50 flex flex-col min-h-[100px]",
                       !isCurMonth && "opacity-20 bg-zinc-950/20"
                     )}>
-                      <span className="text-[16px] font-black text-zinc-700 mb-1">{format(day, 'd')}</span>
+                      <span className="text-xs font-black text-zinc-700 mb-1">{format(day, 'd')}</span>
                       {dayPnL !== 0 && (
                         <div className={cn(
-                          "mt-auto text-[32px] font-black tabular-nums",
+                          "mt-auto text-[14.5px] font-black tabular-nums",
                           dayPnL > 0 ? "text-emerald-400" : "text-rose-400"
                         )}>
                           {dayPnL > 0 ? '+' : ''}{displayValue(dayPnL)}
@@ -1868,12 +1868,12 @@ const PnLCalendar = ({ trades, setSelectedTrade, currency, hidePnL, profileName 
             {/* Weekly Breakdown on Right */}
             <div className="w-48 flex flex-col gap-4">
               <div className="p-6 bg-zinc-900 border border-zinc-800 rounded-[2rem] flex-1 flex flex-col shadow-xl">
-                 <p className="text-zinc-600 font-black uppercase tracking-[0.3em] text-[18px] mb-6 text-center border-b border-zinc-800 pb-4">Weekly Net</p>
+                 <p className="text-zinc-600 font-black uppercase tracking-[0.3em] text-[10px] mb-6 text-center border-b border-zinc-800 pb-4">Weekly Net</p>
                  <div className="flex-1 flex flex-col justify-around">
                     {weeklyPnL.map((pnl, idx) => (
                       <div key={idx} className="text-center py-2">
-                        <p className="text-[14px] font-black text-zinc-700 uppercase tracking-widest mb-1">Week {idx + 1}</p>
-                        <p className={cn("text-[32px] font-black tabular-nums", pnl > 0 ? "text-emerald-400" : (pnl < 0 ? "text-rose-400" : "text-zinc-800"))}>
+                        <p className="text-[8px] font-black text-zinc-700 uppercase tracking-widest mb-1">Week {idx + 1}</p>
+                        <p className={cn("text-[17px] font-black tabular-nums", pnl > 0 ? "text-emerald-400" : (pnl < 0 ? "text-rose-400" : "text-zinc-800"))}>
                           {pnl !== 0 ? (pnl > 0 ? '+' : '') + displayValue(pnl) : '—'}
                         </p>
                       </div>
@@ -1886,17 +1886,17 @@ const PnLCalendar = ({ trades, setSelectedTrade, currency, hidePnL, profileName 
           {/* Footer */}
           <div className="mt-12 pt-12 border-t border-zinc-900 flex justify-between items-end relative z-10">
             <div className="max-w-md">
-              <p className="text-zinc-500 text-sm leading-relaxed font-medium">
+              <p className="text-zinc-500 text-xs leading-relaxed font-medium">
                 This performance snapshot was generated by <span className="text-white font-bold">ZYNC</span> — the professional toolkit for modern market speculators. Tracking {monthTrades.length} positions in {format(currentMonth, 'MMMM')}.
               </p>
             </div>
             <div className="text-right">
-              <p className="text-zinc-700 font-black uppercase tracking-[0.4em] text-[14px] mb-2">zync.intelligence</p>
+              <p className="text-zinc-700 font-black uppercase tracking-[0.4em] text-[10px] mb-2">zync.intelligence</p>
               <div className="flex items-center gap-3 justify-end">
                 <div className="w-10 h-1 px-1 bg-zinc-900 rounded-full flex items-center">
                    <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${monthWinRate}%` }} />
                 </div>
-                <span className="text-[14px] font-black text-zinc-400">{monthWinRate.toFixed(1)}% WR</span>
+                <span className="text-[10px] font-black text-zinc-400">{monthWinRate.toFixed(1)}% WR</span>
               </div>
             </div>
           </div>
