@@ -6735,7 +6735,39 @@ const Execution = ({ trades, onUpdateTrade, currency, hidePnL, user, initialTrad
   initialTradeId?: string | null
 }) => {
   const [selectedTradeId, setSelectedTradeId] = useState<string | null>(initialTradeId || trades[0]?.id || null);
+  const posterRef = React.useRef<HTMLDivElement>(null);
+  const [isCapturing, setIsCapturing] = useState(false);
+  const [captureOrientation, setCaptureOrientation] = useState<'portrait' | 'landscape'>('landscape');
   
+  const handleCapture = async (orientation: 'portrait' | 'landscape') => {
+    setCaptureOrientation(orientation);
+    setIsCapturing(true);
+    // Small delay to ensure state update and DOM preparation
+    await new Promise(resolve => setTimeout(resolve, 600));
+
+    if (!posterRef.current) {
+      setIsCapturing(false);
+      return;
+    }
+    
+    try {
+      const dataUrl = await toPng(posterRef.current, {
+        cacheBust: true,
+        width: orientation === 'portrait' ? 1080 : 1920,
+        height: orientation === 'portrait' ? 1350 : 1080,
+      });
+      
+      const link = document.createElement('a');
+      link.download = `zync-execution-${selectedTrade?.asset.toLowerCase()}-${format(new Date(), 'yyyy-MM-dd')}-${orientation}.png`;
+      link.href = dataUrl;
+      link.click();
+    } catch (err) {
+      console.error('Failed to capture execution:', err);
+    } finally {
+      setIsCapturing(false);
+    }
+  };
+
   useEffect(() => {
     if (initialTradeId) {
       setSelectedTradeId(initialTradeId);
@@ -6816,6 +6848,24 @@ const Execution = ({ trades, onUpdateTrade, currency, hidePnL, user, initialTrad
           <div>
             <h2 className="text-4xl font-black text-white tracking-tighter">Market <span className="text-indigo-400">Execution</span></h2>
             <p className="text-zinc-500 text-sm">Visual analysis and deep trade reflection.</p>
+          </div>
+          <div className="flex gap-2">
+            <button 
+              onClick={() => handleCapture('portrait')}
+              disabled={isCapturing || !selectedTrade}
+              className="flex items-center gap-2 px-4 py-2 bg-zinc-900 hover:bg-zinc-800 text-zinc-400 rounded-xl border border-zinc-800 transition-all text-[10px] font-black uppercase tracking-widest disabled:opacity-50"
+            >
+              <Camera className="w-3 h-3" />
+              Portrait
+            </button>
+            <button 
+              onClick={() => handleCapture('landscape')}
+              disabled={isCapturing || !selectedTrade}
+              className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-black rounded-xl transition-all text-[10px] font-black uppercase tracking-widest disabled:opacity-50 hover:scale-105 active:scale-95 shadow-lg shadow-emerald-500/20"
+            >
+              <Camera className="w-3 h-3" />
+              Snap Execution
+            </button>
           </div>
         </div>
       </ScrollAnimatedSection>
@@ -7261,6 +7311,194 @@ const Execution = ({ trades, onUpdateTrade, currency, hidePnL, user, initialTrad
         </div>
       </div>
       </ScrollAnimatedSection>
+
+      {/* Hidden Poster Target for Snapshot */}
+      <div className="fixed left-[-9999px] top-0 pointer-events-none">
+        {selectedTrade && (
+          <div 
+            ref={posterRef}
+            style={{ 
+              width: captureOrientation === 'portrait' ? '1080px' : '1920px', 
+              height: captureOrientation === 'portrait' ? '1350px' : '1080px' 
+            }}
+            className="bg-black flex flex-col p-16 relative overflow-hidden text-white font-sans border-[16px] border-zinc-900"
+          >
+            {/* Decorative elements */}
+            <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-emerald-500/10 blur-[200px] rounded-full -mr-96 -mt-96" />
+            <div className="absolute bottom-0 left-0 w-[800px] h-[800px] bg-indigo-500/10 blur-[200px] rounded-full -ml-96 -mb-96" />
+            
+            {/* Poster Header */}
+            <div className="flex justify-between items-start relative z-10 mb-12">
+              <div className="space-y-1">
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 bg-emerald-500 rounded-2xl flex items-center justify-center font-black text-3xl text-black">Z</div>
+                  <div>
+                     <h2 className="text-4xl font-black tracking-tighter">ZYNC</h2>
+                     <p className="text-zinc-600 text-[10px] font-black uppercase tracking-[0.4em]">Execution Report</p>
+                  </div>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-zinc-600 text-[10px] font-black uppercase tracking-[0.3em]">Market Dynamics</p>
+                <p className="text-2xl font-black text-zinc-300">{format(parseISO(selectedTrade.entryDate), 'MMM dd, yyyy')}</p>
+              </div>
+            </div>
+
+            <div className={cn(
+              "flex relative z-10 gap-12",
+              captureOrientation === 'portrait' ? "flex-col" : "flex-row items-center"
+            )}>
+              <div className={cn(
+                "space-y-2",
+                captureOrientation === 'portrait' ? "mb-12" : "flex-1"
+              )}>
+                <p className="text-zinc-600 font-black uppercase tracking-[0.5em] text-xs">{selectedTrade.marketType}</p>
+                <h1 className={cn(
+                  "font-black tracking-tighter leading-tight",
+                  captureOrientation === 'portrait' ? "text-7xl" : "text-8xl"
+                )}>
+                  {selectedTrade.asset}
+                </h1>
+                <div className={cn(
+                  "flex items-center gap-4 py-2 px-4 rounded-xl inline-flex",
+                  selectedTrade.side === 'Long' ? "bg-emerald-500/10 text-emerald-500" : "bg-rose-500/10 text-rose-500"
+                )}>
+                   <Zap className="w-4 h-4 fill-current" />
+                   <span className="font-black uppercase tracking-widest text-sm">{selectedTrade.side} Position</span>
+                </div>
+              </div>
+
+              <div className={cn(
+                "grid gap-8",
+                captureOrientation === 'portrait' ? "grid-cols-2" : "grid-cols-2 w-1/3"
+              )}>
+                <div className="p-8 bg-zinc-900 border border-zinc-800 rounded-[2rem]">
+                  <p className="text-zinc-600 font-black uppercase tracking-[0.3em] text-[10px] mb-3">Net Impact</p>
+                  <p className={cn("text-4xl font-black tabular-nums tracking-tighter", selectedTrade.pnl >= 0 ? "text-emerald-400" : "text-rose-400")}>
+                    {displayValue(selectedTrade.pnl, true)}
+                  </p>
+                </div>
+                <div className="p-8 bg-zinc-900 border border-zinc-800 rounded-[2rem]">
+                  <p className="text-zinc-600 font-black uppercase tracking-[0.3em] text-[10px] mb-3">Efficiency</p>
+                  <p className="text-4xl font-black text-white tabular-nums tracking-tighter">
+                    {selectedTrade.riskReward}R
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Main Visual: Trade Screenshot */}
+            <div className="mt-12 flex-1 relative z-10 bg-zinc-900/50 border border-zinc-800 rounded-[2.5rem] overflow-hidden flex flex-col shadow-2xl">
+               {(selectedTrade.executionImage || selectedTrade.screenshot) ? (
+                 <img 
+                   src={selectedTrade.executionImage || selectedTrade.screenshot} 
+                   alt="Execution Feed" 
+                   className="w-full h-full object-cover"
+                 />
+               ) : (
+                 <div className="w-full h-full flex items-center justify-center text-zinc-800">
+                    <LayoutGrid className="w-24 h-24 stroke-[1]" />
+                 </div>
+               )}
+               <div className="absolute top-8 left-8 px-4 py-2 bg-black/60 backdrop-blur-xl rounded-xl border border-white/10">
+                  <span className="text-[10px] font-black text-white uppercase tracking-widest">Global Structure Feed</span>
+               </div>
+            </div>
+
+            {/* Secondary Intel Grid */}
+            <div className="mt-12 grid grid-cols-4 gap-8 relative z-10">
+               <div className="p-8 bg-zinc-900 border border-zinc-800 rounded-[2rem]">
+                  <p className="text-zinc-600 font-black uppercase tracking-[0.3em] text-[10px] mb-4">Entry / Exit</p>
+                  <div className="space-y-4">
+                     <div>
+                        <p className="text-[10px] text-zinc-500 font-black uppercase tracking-widest mb-1">Entry Price</p>
+                        <p className="text-base font-black tabular-nums">{formatCurrency(selectedTrade.entryPrice || 0, currency)}</p>
+                     </div>
+                     <div>
+                        <p className="text-[10px] text-zinc-500 font-black uppercase tracking-widest mb-1">Exit Price</p>
+                        <p className="text-base font-black tabular-nums">{formatCurrency(selectedTrade.exitPrice || 0, currency)}</p>
+                     </div>
+                  </div>
+               </div>
+               
+               <div className="p-8 bg-zinc-900 border border-zinc-800 rounded-[2rem]">
+                  <p className="text-zinc-600 font-black uppercase tracking-[0.3em] text-[10px] mb-4">Trade Volume</p>
+                  <div className="space-y-4">
+                     <div>
+                        <p className="text-[10px] text-zinc-500 font-black uppercase tracking-widest mb-1">Quantity</p>
+                        <p className="text-base font-black tabular-nums">{selectedTrade.positionSize} Units</p>
+                     </div>
+                     <div>
+                        <p className="text-[10px] text-zinc-500 font-black uppercase tracking-widest mb-1">Strategy</p>
+                        <p className="text-base font-black truncate">{selectedTrade.strategy}</p>
+                     </div>
+                  </div>
+               </div>
+
+               <div className="p-8 bg-zinc-900 border border-zinc-800 rounded-[2rem]">
+                  <p className="text-zinc-600 font-black uppercase tracking-[0.3em] text-[10px] mb-4">Psychology</p>
+                  <div className="space-y-4">
+                     <div>
+                        <p className="text-[10px] text-zinc-500 font-black uppercase tracking-widest mb-1">Emotional State</p>
+                        <p className="text-base font-black capitalize">{selectedTrade.emotionalState}</p>
+                     </div>
+                     <div>
+                        <p className="text-[10px] text-zinc-500 font-black uppercase tracking-widest mb-1">Confidence</p>
+                        <div className="flex items-center gap-2">
+                           <div className="flex-1 h-1 bg-zinc-800 rounded-full overflow-hidden">
+                              <div className="h-full bg-indigo-500" style={{ width: `${(selectedTrade.confidence || 0) * 10}%` }} />
+                           </div>
+                           <span className="text-[10px] font-black">{selectedTrade.confidence}/10</span>
+                        </div>
+                     </div>
+                  </div>
+               </div>
+
+               <div className="p-8 bg-zinc-900 border border-zinc-800 rounded-[2rem]">
+                  <p className="text-zinc-600 font-black uppercase tracking-[0.3em] text-[10px] mb-4">Risk Profile</p>
+                  <div className="space-y-4">
+                     <div>
+                        <p className="text-[10px] text-zinc-500 font-black uppercase tracking-widest mb-1">News Impact</p>
+                        <span className={cn(
+                          "px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-tighter",
+                          selectedTrade.newsImpact === 'Red' ? "bg-rose-500/20 text-rose-500" : "bg-zinc-800 text-zinc-500"
+                        )}>
+                           {selectedTrade.newsImpact} News
+                        </span>
+                     </div>
+                     <div>
+                        <p className="text-[10px] text-zinc-500 font-black uppercase tracking-widest mb-1">Compliance</p>
+                        <div className="flex gap-1">
+                           {(selectedTrade.followedRules || []).slice(0, 3).map((_, i) => (
+                             <div key={i} className="w-2 h-2 rounded-full bg-emerald-500" />
+                           ))}
+                           {(selectedTrade.mistakeTags || []).slice(0, 3).map((_, i) => (
+                             <div key={i} className="w-2 h-2 rounded-full bg-rose-500" />
+                           ))}
+                        </div>
+                     </div>
+                  </div>
+               </div>
+            </div>
+
+            {/* Footer */}
+            <div className="mt-12 pt-12 border-t border-zinc-900 flex justify-between items-end relative z-10">
+              <div className="max-w-md">
+                <p className="text-zinc-500 text-xs leading-relaxed font-medium">
+                  Verified <span className="text-white font-bold">ZYNC</span> Execution Pulse. This position was strictly logged and analyzed for forensic performance tracking.
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-zinc-700 font-black uppercase tracking-[0.4em] text-[10px] mb-2">zync.intelligence</p>
+                <div className="flex items-center gap-3 justify-end">
+                   <ShieldCheck className="w-4 h-4 text-emerald-500" />
+                   <span className="text-[10px] font-black text-zinc-400">AUTHENTICATED TRADER</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
