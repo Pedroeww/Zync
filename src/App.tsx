@@ -58,6 +58,8 @@ import {
   LayoutGrid,
   Bell,
   RotateCw,
+  Brain,
+  Tags,
   ShieldCheck,
   Activity
 } from 'lucide-react';
@@ -160,6 +162,7 @@ import {
   endOfMonth,
   startOfWeek,
   endOfWeek,
+  formatDistanceStrict,
   addMonths,
   subMonths,
   isWithinInterval,
@@ -2356,6 +2359,19 @@ const TradeJournal = ({ trades, onAddTrade, onUpdateTrade, onDeleteTrade, settin
                     </div>
                   </div>
                 </div>
+                <div>
+                  <p className="text-[10px] text-zinc-500 uppercase tracking-widest mb-1">Trade Info</p>
+                  <div className="space-y-4">
+                    <div>
+                      <span className="text-xs text-zinc-400 block">Quantity</span>
+                      <span className="text-lg font-mono font-bold text-zinc-100">{selectedTrade.positionSize}</span>
+                    </div>
+                    <div>
+                      <span className="text-xs text-zinc-400 block">Strategy</span>
+                      <span className="text-lg font-bold text-zinc-300">{selectedTrade.strategy}</span>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <div className="p-6 bg-zinc-800/50 rounded-2xl space-y-4 border border-zinc-800">
@@ -2736,6 +2752,21 @@ const TradeJournal = ({ trades, onAddTrade, onUpdateTrade, onDeleteTrade, settin
                       <option value="Closed Manually">Closed Manually</option>
                     </select>
                   </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">Quantity (Lots/Contracts)</label>
+                    <input 
+                      name="positionSize" 
+                      type="number" 
+                      step="any" 
+                      defaultValue={editingTrade?.positionSize}
+                      required 
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-2 text-zinc-100 focus:ring-1 focus:ring-emerald-500 outline-none" 
+                      placeholder="e.g. 1.0 or 0.1" 
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
                   <div className="grid grid-cols-2 gap-2">
                     <div>
                       <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">Actual RR</label>
@@ -2792,21 +2823,9 @@ const TradeJournal = ({ trades, onAddTrade, onUpdateTrade, onDeleteTrade, settin
                     <p className="text-[10px] text-zinc-600 mt-2 italic">Use negative values for losses.</p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-3 gap-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                  <div className="grid grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2 duration-300">
                     <div>
-                      <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">Size</label>
-                      <input 
-                        name="positionSize" 
-                        type="number" 
-                        step="any" 
-                        defaultValue={editingTrade?.positionSize}
-                        required={!isManualPnl} 
-                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-2 text-zinc-100 focus:ring-1 focus:ring-emerald-500 outline-none" 
-                        placeholder="0.1" 
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">Entry</label>
+                      <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">Entry Price</label>
                       <input 
                         name="entryPrice" 
                         type="number" 
@@ -2818,7 +2837,7 @@ const TradeJournal = ({ trades, onAddTrade, onUpdateTrade, onDeleteTrade, settin
                       />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">Exit</label>
+                      <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">Exit Price</label>
                       <input 
                         name="exitPrice" 
                         type="number" 
@@ -4898,7 +4917,10 @@ const AINewsAnalysis = ({ news, includeFutures = true }: { news: any[], includeF
       });
       
       const text = response.text || '';
-      const cleanedText = text.replace(/```json|```/g, '').trim();
+      const startIdx = text.indexOf('{');
+      const endIdx = text.lastIndexOf('}');
+      if (startIdx === -1 || endIdx === -1) throw new Error('Invalid AI response: JSON not found');
+      const cleanedText = text.substring(startIdx, endIdx + 1);
       const parsed = JSON.parse(cleanedText);
       
       if (!parsed || typeof parsed !== 'object') throw new Error('Invalid AI response format');
@@ -5741,7 +5763,10 @@ const NYCOpenBiasAnalyst = ({ starredSymbol }: { starredSymbol: string | null })
       });
       
       const text = response.text || "";
-      const cleanedText = text.replace(/```json|```/g, '').trim();
+      const startIdx = text.indexOf('{');
+      const endIdx = text.lastIndexOf('}');
+      if (startIdx === -1 || endIdx === -1) throw new Error('Invalid institutional response data.');
+      const cleanedText = text.substring(startIdx, endIdx + 1);
       const parsed = JSON.parse(cleanedText);
       
       setAnalysis({
@@ -6865,6 +6890,49 @@ const Execution = ({ trades, onUpdateTrade, currency, hidePnL, user, initialTrad
         <div className="lg:col-span-3 space-y-6">
           {selectedTrade ? (
             <div className="space-y-6">
+              {/* Detailed Header for Selected Trade */}
+              <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                 <div className="flex items-center gap-6">
+                    <div className={cn(
+                      "w-16 h-16 rounded-2xl flex items-center justify-center font-black text-2xl shadow-inner",
+                      selectedTrade.pnl >= 0 ? "bg-emerald-500/10 text-emerald-500" : "bg-rose-500/10 text-rose-500"
+                    )}>
+                       {selectedTrade.asset.substring(0, 2).toUpperCase()}
+                    </div>
+                    <div>
+                       <div className="flex items-center gap-3">
+                          <h3 className="text-2xl font-black text-white tracking-tighter">{selectedTrade.asset}</h3>
+                          <span className={cn(
+                            "px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest",
+                            selectedTrade.side === 'Long' ? "bg-emerald-500/20 text-emerald-500" : "bg-rose-500/20 text-rose-500"
+                          )}>
+                            {selectedTrade.side}
+                          </span>
+                       </div>
+                       <div className="flex items-center gap-4 mt-1">
+                          <p className="text-[10px] text-zinc-500 font-black uppercase tracking-[0.2em]">{selectedTrade.marketType}</p>
+                          <div className="w-1 h-1 rounded-full bg-zinc-800" />
+                          <p className="text-[10px] text-zinc-500 font-black uppercase tracking-[0.2em]">{format(parseISO(selectedTrade.entryDate), 'MMM dd, yyyy')}</p>
+                       </div>
+                    </div>
+                 </div>
+                 
+                 <div className="flex items-center gap-8 md:text-right">
+                    <div>
+                       <p className="text-[10px] text-zinc-500 font-black uppercase tracking-widest mb-1">Duration</p>
+                       <p className="text-xs font-bold text-white">
+                          {formatDistanceStrict(parseISO(selectedTrade.exitDate), parseISO(selectedTrade.entryDate))}
+                       </p>
+                    </div>
+                    <div>
+                       <p className="text-[10px] text-zinc-500 font-black uppercase tracking-widest mb-1">Final Result</p>
+                       <p className={cn("text-xl font-black tracking-tight", selectedTrade.pnl >= 0 ? "text-emerald-400" : "text-rose-400")}>
+                          {displayValue(selectedTrade.pnl, true)}
+                       </p>
+                    </div>
+                 </div>
+              </div>
+
               <div 
                 className="relative aspect-video bg-zinc-950 rounded-3xl border border-zinc-800 overflow-hidden group outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer"
                 onDragOver={(e) => {
@@ -6968,24 +7036,185 @@ const Execution = ({ trades, onUpdateTrade, currency, hidePnL, user, initialTrad
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-2xl">
-                  <p className="text-[8px] text-zinc-500 uppercase tracking-widest mb-1">Exit Status</p>
-                  <p className="text-xs font-bold text-zinc-100">{selectedTrade.exitStatus || 'Not Set'}</p>
+                <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-2xl flex flex-col justify-between">
+                  <div>
+                    <p className="text-[8px] text-zinc-500 uppercase tracking-widest mb-1 flex items-center gap-1.5">
+                      <Target className="w-2 h-2" />
+                      Entry Price
+                    </p>
+                    <p className="text-sm font-black text-white tabular-nums">{formatCurrency(selectedTrade.entryPrice || 0, currency)}</p>
+                  </div>
+                  <div className="mt-4 pt-4 border-t border-zinc-800/50">
+                    <p className="text-[8px] text-zinc-500 uppercase tracking-widest mb-1 flex items-center gap-1.5">
+                      <LogOut className="w-2 h-2" />
+                      Exit Price
+                    </p>
+                    <p className="text-sm font-black text-white tabular-nums">{formatCurrency(selectedTrade.exitPrice || 0, currency)}</p>
+                  </div>
                 </div>
-                <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-2xl">
-                  <p className="text-[8px] text-zinc-500 uppercase tracking-widest mb-1">Actual RR</p>
-                  <p className="text-xs font-bold text-emerald-400">{selectedTrade.riskReward || 0}R</p>
+                
+                <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-2xl flex flex-col justify-between">
+                  <div>
+                    <p className="text-[8px] text-zinc-500 uppercase tracking-widest mb-1 flex items-center gap-1.5">
+                      <Scale className="w-2 h-2" />
+                      Quantity
+                    </p>
+                    <p className="text-sm font-black text-white tabular-nums">{selectedTrade.positionSize || 0}</p>
+                  </div>
+                  <div className="mt-4 pt-4 border-t border-zinc-800/50">
+                    <p className="text-[8px] text-zinc-500 uppercase tracking-widest mb-1 flex items-center gap-1.5">
+                      <ShieldCheck className="w-2 h-2" />
+                      Strategy
+                    </p>
+                    <p className="text-sm font-black text-white truncate max-w-full">{selectedTrade.strategy || 'No Strategy'}</p>
+                  </div>
                 </div>
-                <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-2xl">
-                  <p className="text-[8px] text-zinc-500 uppercase tracking-widest mb-1">Target RR</p>
-                  <p className="text-xs font-bold text-indigo-400">{selectedTrade.targetRR || 0}R</p>
+
+                <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-2xl flex flex-col justify-between">
+                  <div>
+                    <p className="text-[8px] text-zinc-500 uppercase tracking-widest mb-1 flex items-center gap-1.5">
+                      <Zap className="w-2 h-2" />
+                      Trade Side
+                    </p>
+                    <div className="flex items-center gap-2">
+                       <span className={cn(
+                         "text-[9px] px-2 py-0.5 rounded-md font-black uppercase",
+                         selectedTrade.side === 'Long' ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/10" : "bg-rose-500/10 text-rose-500 border border-rose-500/10"
+                       )}>
+                         {selectedTrade.side}
+                       </span>
+                       <span className="text-[9px] px-2 py-0.5 bg-zinc-800 text-zinc-400 rounded-md font-black uppercase">
+                         {selectedTrade.marketType}
+                       </span>
+                    </div>
+                  </div>
+                  <div className="mt-4 pt-4 border-t border-zinc-800/50">
+                    <p className="text-[8px] text-zinc-500 uppercase tracking-widest mb-1 flex items-center gap-1.5">
+                      <Calendar className="w-2 h-2" />
+                      Market Time
+                    </p>
+                    <p className="text-[10px] font-bold text-zinc-300">
+                      {format(parseISO(selectedTrade.entryDate), 'MMM dd, HH:mm')}
+                    </p>
+                  </div>
                 </div>
-                <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-2xl">
-                  <p className="text-[8px] text-zinc-500 uppercase tracking-widest mb-1">Outcome</p>
-                  <p className={cn("text-xs font-black", (selectedTrade.pnl || 0) >= 0 ? "text-emerald-400" : "text-rose-400")}>
-                    {displayValue(selectedTrade.pnl)} ({(selectedTrade.pnlPercentage || 0).toFixed(2)}%)
-                  </p>
+
+                <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-2xl flex flex-col justify-between relative overflow-hidden group">
+                  <div className={cn(
+                    "absolute top-0 right-0 w-24 h-24 blur-2xl rounded-full opacity-10 -mr-12 -mt-12",
+                    (selectedTrade.pnl || 0) >= 0 ? "bg-emerald-500" : "bg-rose-500"
+                  )} />
+                  <div>
+                    <p className="text-[8px] text-zinc-500 uppercase tracking-widest mb-1">Impact</p>
+                    <p className={cn("text-lg font-black tracking-tighter tabular-nums", (selectedTrade.pnl || 0) >= 0 ? "text-emerald-400" : "text-rose-400")}>
+                      {displayValue(selectedTrade.pnl)}
+                    </p>
+                  </div>
+                  <div className="mt-4 pt-4 border-t border-zinc-800/50">
+                    <div className="flex justify-between items-end">
+                       <div>
+                         <p className="text-[8px] text-zinc-500 uppercase tracking-widest mb-1">Percentage</p>
+                         <p className={cn("text-xs font-black", (selectedTrade.pnlPercentage || 0) >= 0 ? "text-emerald-400" : "text-rose-400")}>
+                           {(selectedTrade.pnlPercentage || 0).toFixed(2)}%
+                         </p>
+                       </div>
+                       <div className="text-right">
+                         <p className="text-[8px] text-zinc-500 uppercase tracking-widest mb-1">Outcome</p>
+                         <p className="text-[9px] font-black text-white uppercase">{selectedTrade.riskReward}R Profit</p>
+                       </div>
+                    </div>
+                  </div>
                 </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                 <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
+                    <div className="flex items-center gap-3 mb-4">
+                       <div className="p-2 bg-indigo-500/10 rounded-xl border border-indigo-500/20">
+                          <Brain className="w-4 h-4 text-indigo-400" />
+                       </div>
+                       <h3 className="text-[10px] font-black uppercase tracking-widest text-zinc-100">Trade Psychology</h3>
+                    </div>
+                    <div className="space-y-4">
+                       <div>
+                          <p className="text-[9px] text-zinc-500 uppercase tracking-wider mb-2">Emotional State</p>
+                          <div className="flex items-center gap-2">
+                             <div className="w-2 h-2 rounded-full bg-indigo-500" />
+                             <span className="text-xs font-bold text-white capitalize">{selectedTrade.emotionalState}</span>
+                          </div>
+                       </div>
+                       <div>
+                          <p className="text-[9px] text-zinc-500 uppercase tracking-wider mb-2">Confidence Level</p>
+                          <div className="flex items-center gap-3">
+                             <div className="flex-1 h-1 bg-zinc-800 rounded-full overflow-hidden">
+                                <div 
+                                  className="h-full bg-indigo-500" 
+                                  style={{ width: `${(selectedTrade.confidence || 0) * 10}%` }}
+                                />
+                             </div>
+                             <span className="text-[10px] font-black text-white tabular-nums">{selectedTrade.confidence}/10</span>
+                          </div>
+                       </div>
+                    </div>
+                 </div>
+
+                 <div className="md:col-span-2 bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
+                    <div className="flex items-center justify-between mb-4">
+                       <div className="flex items-center gap-3">
+                          <div className="p-2 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
+                             <Activity className="w-4 h-4 text-emerald-400" />
+                          </div>
+                          <h3 className="text-[10px] font-black uppercase tracking-widest text-zinc-100">Execution Quality & Rules</h3>
+                       </div>
+                       <div className="flex gap-2">
+                          <span className={cn(
+                            "px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-tighter",
+                            selectedTrade.newsImpact === 'Red' ? "bg-rose-500/20 text-rose-500" : 
+                            selectedTrade.newsImpact === 'Orange' ? "bg-orange-500/20 text-orange-500" :
+                            selectedTrade.newsImpact === 'Yellow' ? "bg-yellow-500/20 text-yellow-500" : "bg-zinc-800 text-zinc-500"
+                          )}>
+                             {selectedTrade.newsImpact} News Impact
+                          </span>
+                       </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                       <div>
+                          <p className="text-[9px] text-zinc-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                             <ShieldCheck className="w-3 h-3 text-emerald-500" />
+                             Rules Followed
+                          </p>
+                          <div className="flex flex-wrap gap-2">
+                             {selectedTrade.followedRules?.length > 0 ? (
+                               selectedTrade.followedRules.map((rule, idx) => (
+                                 <span key={idx} className="px-2 py-1 bg-emerald-500/5 text-emerald-500/70 border border-emerald-500/10 rounded-lg text-[9px] font-bold">
+                                   {rule}
+                                 </span>
+                               ))
+                             ) : (
+                               <span className="text-[9px] text-zinc-600 italic">No rules specified</span>
+                             )}
+                          </div>
+                       </div>
+                       <div>
+                          <p className="text-[9px] text-zinc-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                             <Tags className="w-3 h-3 text-rose-500" />
+                             Mistakes identified
+                          </p>
+                          <div className="flex flex-wrap gap-2">
+                             {selectedTrade.mistakeTags?.length > 0 ? (
+                               selectedTrade.mistakeTags.map((tag, idx) => (
+                                 <span key={idx} className="px-2 py-1 bg-rose-500/5 text-rose-500/70 border border-rose-500/10 rounded-lg text-[9px] font-bold">
+                                   {tag}
+                                 </span>
+                               ))
+                             ) : (
+                               <span className="text-[9px] text-zinc-600 italic">No mistakes identified</span>
+                             )}
+                          </div>
+                       </div>
+                    </div>
+                 </div>
               </div>
 
               <div className="bg-zinc-900 border border-zinc-800 rounded-3xl overflow-hidden shadow-xl">
@@ -7009,6 +7238,20 @@ const Execution = ({ trades, onUpdateTrade, currency, hidePnL, user, initialTrad
                     </div>
                  </div>
               </div>
+
+              {selectedTrade.notes && (
+                <div className="bg-zinc-900 border border-zinc-800 rounded-3xl overflow-hidden shadow-xl mt-6">
+                   <div className="px-8 py-5 border-b border-zinc-800 bg-zinc-950/50 flex items-center gap-3">
+                     <BookOpen className="w-4 h-4 text-emerald-400" />
+                     <h3 className="text-xs font-black uppercase tracking-widest text-zinc-400">Journal Notes</h3>
+                   </div>
+                   <div className="p-8">
+                      <p className="text-zinc-400 text-sm italic leading-relaxed">
+                        {selectedTrade.notes}
+                      </p>
+                   </div>
+                </div>
+              )}
             </div>
           ) : (
             <div className="h-full flex items-center justify-center bg-zinc-950/30 rounded-3xl border border-zinc-800 border-dashed border-2">
