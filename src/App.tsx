@@ -1194,6 +1194,18 @@ const Dashboard = ({ stats, trades, onTabChange, profileName, currency, hidePnL,
   const [selectedTrade, setSelectedTrade] = useState<Trade | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [activityFilter, setActivityFilter] = useState<'all' | 'wins' | 'losses'>('all');
+
+  const recentActivityTrades = useMemo(() => {
+    let filtered = [...trades];
+    if (activityFilter === 'wins') {
+      filtered = filtered.filter(t => t.pnl >= 0);
+    } else if (activityFilter === 'losses') {
+      filtered = filtered.filter(t => t.pnl < 0);
+    }
+    // Sort descending by date (most recent first)
+    return filtered.sort((a, b) => parseISO(b.entryDate).getTime() - parseISO(a.entryDate).getTime());
+  }, [trades, activityFilter]);
 
   const handleScreenshotUpload = async (file: File) => {
     if (!selectedTrade || !user || !file.type.startsWith('image/')) return;
@@ -1256,6 +1268,8 @@ const Dashboard = ({ stats, trades, onTabChange, profileName, currency, hidePnL,
     return data;
   }, [trades, startingBalance]);
 
+  const totalBalance = startingBalance + stats.totalPnL;
+
   return (
     <div className="space-y-8">
         <ScrollAnimatedSection>
@@ -1270,7 +1284,18 @@ const Dashboard = ({ stats, trades, onTabChange, profileName, currency, hidePnL,
           />
         </ScrollAnimatedSection>
         
-        <ScrollAnimatedSection delay={0.1} className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <ScrollAnimatedSection delay={0.1} className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+          <StatsCard 
+            label="Starting Balance" 
+            value={displayValue(startingBalance)} 
+            subValue="Base Capital"
+          />
+          <StatsCard 
+            label="Current Balance" 
+            value={displayValue(totalBalance)} 
+            type={totalBalance >= startingBalance ? 'profit' : 'loss'}
+            subValue="Total Equity"
+          />
           <StatsCard 
             label="Total P&L" 
             value={displayValue(stats.totalPnL)} 
@@ -1388,31 +1413,63 @@ const Dashboard = ({ stats, trades, onTabChange, profileName, currency, hidePnL,
           </div>
         </div>
 
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden flex flex-col">
-          <div className="px-5 py-4 border-b border-zinc-800 flex items-center justify-between">
-            <h3 className="text-sm font-semibold">Recent Activity</h3>
-            <button onClick={() => onTabChange('journal')} className="text-xs text-emerald-400 hover:underline">View All</button>
+        <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden flex flex-col h-[420px]">
+          <div className="px-5 py-4 border-b border-zinc-800 space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold">Recent Activity</h3>
+              <button onClick={() => onTabChange('journal')} className="text-xs text-emerald-400 hover:underline font-bold uppercase tracking-widest text-[9px]">View All</button>
+            </div>
+            <div className="flex gap-1.5">
+               {(['all', 'wins', 'losses'] as const).map((filter) => (
+                 <button
+                   key={filter}
+                   onClick={() => setActivityFilter(filter)}
+                   className={cn(
+                     "px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all border",
+                     activityFilter === filter 
+                       ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" 
+                       : "bg-zinc-950 text-zinc-500 border-zinc-800 hover:text-zinc-300"
+                   )}
+                 >
+                   {filter}
+                 </button>
+               ))}
+            </div>
           </div>
-          <div className="divide-y divide-zinc-800 flex-1 overflow-y-auto">
-            {trades.slice(0, 5).map(trade => (
-              <div key={trade.id} className="p-4 hover:bg-zinc-800 transition-colors cursor-pointer group">
-                <div className="flex justify-between items-start mb-1">
-                  <p className="font-semibold text-white text-xs">{trade.asset} <span className="text-[10px] text-zinc-600 ml-1">{trade.side}</span></p>
-                  <p className={cn("font-bold text-xs", trade.pnl >= 0 ? "text-emerald-400" : "text-rose-400")}>
-                    {trade.pnl >= 0 ? '+' : ''}{formatCurrency(trade.pnl)}
-                  </p>
-                </div>
-                <div className="flex justify-between items-center">
-                  <p className="text-[10px] text-zinc-500">{trade.strategy}</p>
-                  <div className={cn(
-                    "px-1.5 py-0.5 rounded-full text-[8px] font-bold border",
-                    trade.pnl >= 0 ? "bg-emerald-900/30 text-emerald-400 border-emerald-900/50" : "bg-rose-900/30 text-rose-400 border-rose-900/50"
-                  )}>
-                    {trade.pnl >= 0 ? 'WIN' : 'LOSS'}
+          <div className="divide-y divide-zinc-800 flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent">
+            {recentActivityTrades.length > 0 ? (
+              recentActivityTrades.map(trade => (
+                <div 
+                  key={trade.id} 
+                  onClick={() => onSelectExecution(trade.id)}
+                  className="p-4 hover:bg-zinc-800/50 transition-colors cursor-pointer group"
+                >
+                  <div className="flex justify-between items-start mb-1">
+                    <p className="font-semibold text-white text-xs">{trade.asset} <span className="text-[10px] text-zinc-600 ml-1">{trade.side}</span></p>
+                    <p className={cn("font-bold text-xs", trade.pnl >= 0 ? "text-emerald-400" : "text-rose-400")}>
+                      {trade.pnl >= 0 ? '+' : ''}{formatCurrency(trade.pnl, currency)}
+                    </p>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <p className="text-[10px] text-zinc-500">{trade.strategy}</p>
+                    <div className={cn(
+                      "px-1.5 py-0.5 rounded-full text-[8px] font-bold border",
+                      trade.pnl >= 0 ? "bg-emerald-900/30 text-emerald-400 border-emerald-900/50" : "bg-rose-900/30 text-rose-400 border-rose-900/50"
+                    )}>
+                      {trade.pnl >= 0 ? 'WIN' : 'LOSS'}
+                    </div>
                   </div>
                 </div>
+              ))
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full p-8 text-center bg-zinc-950/20">
+                 <div className="w-12 h-12 rounded-full bg-zinc-900 flex items-center justify-center mb-4 border border-zinc-800">
+                    <History className="w-6 h-6 text-zinc-600" />
+                 </div>
+                 <p className="text-zinc-500 text-[10px] font-black uppercase tracking-widest">No activity in this view</p>
+                 <p className="text-zinc-700 text-[9px] mt-1 italic tracking-tight">Try adjusting your filters</p>
               </div>
-            ))}
+            )}
           </div>
         </div>
       </ScrollAnimatedSection>
@@ -5991,30 +6048,38 @@ const EconomicCalendar = () => {
   };
   
   const economicEvents = useMemo(() => {
-    // Shared events from BankForecast or similar
-    const allEvents = [
-      // Current Week (May 4 - May 10, 2026)
-      { date: '2026-05-04', time: '09:30', currency: 'AUD', impact: 'medium', event: 'ANZ Job Advertisements', actual: '1.2%', forecast: '0.8%', previous: '-1.5%', desc: 'Measure of the change in the number of jobs advertised.' },
-      { date: '2026-05-05', time: '04:30', currency: 'GBP', impact: 'medium', event: 'Final Services PMI', actual: '53.4', forecast: '53.1', previous: '53.1', desc: 'Economic health of the services sector.' },
-      { date: '2026-05-05', time: '10:00', currency: 'USD', impact: 'high', event: 'ISM Services PMI', actual: '52.8', forecast: '52.0', previous: '51.4', desc: 'Survey of purchasing managers in the services industry.' },
-      { date: '2026-05-06', time: '08:15', currency: 'USD', impact: 'high', event: 'ADP Non-Farm Employment Change', actual: '188K', forecast: '175K', previous: '184K', desc: 'Estimate of the change in the number of employed people.' },
-      { date: '2026-05-06', time: '10:30', currency: 'USD', impact: 'medium', event: 'Crude Oil Inventories', actual: '-1.4M', forecast: '-1.1M', previous: '7.3M', desc: 'Change in the number of barrels of crude oil held in inventory.' },
-      { date: '2026-05-07', time: '07:00', currency: 'GBP', impact: 'high', event: 'Official Bank Rate', actual: '5.25%', forecast: '5.25%', previous: '5.25%', desc: 'Interest rate at which the BoE lends to financial institutions.' },
-      { date: '2026-05-07', time: '08:30', currency: 'USD', impact: 'high', event: 'Unemployment Claims', actual: '212K', forecast: '215K', previous: '208K', desc: 'Number of individuals who filed for unemployment insurance.' },
-      { date: '2026-05-08', time: '08:30', currency: 'USD', impact: 'high', event: 'Non-Farm Employment Change', actual: '-', forecast: '243K', previous: '303K', desc: 'Change in the number of employed people during the previous month.' },
-      { date: '2026-05-08', time: '08:30', currency: 'USD', impact: 'high', event: 'Unemployment Rate', actual: '-', forecast: '3.8%', previous: '3.8%', desc: 'Percentage of the total work force that is unemployed.' },
-      { date: '2026-05-09', time: '09:00', currency: 'CAD', impact: 'low', event: 'BOC Gov Macklem Speaks', actual: '-', forecast: '-', previous: '-', desc: 'Speech by the Governor of the Bank of Canada.' },
+    const startOfThisWeek = startOfWeek(new Date(), { weekStartsOn: 1 });
+    const startOfNextWeek = addWeeks(startOfThisWeek, 1);
+    
+    const getDaysDate = (start: Date, dayIndex: number) => format(addDays(start, dayIndex), 'yyyy-MM-dd');
 
-      // Next Week (May 11 - May 17, 2026)
-      { date: '2026-05-11', time: '08:30', currency: 'USD', impact: 'low', event: 'NY Empire State Manufacturing Index', actual: '-', forecast: '-5.2', previous: '-14.3', desc: 'Manufacturing conditions in New York State.' },
-      { date: '2026-05-12', time: '08:30', currency: 'USD', impact: 'high', event: 'PPI m/m', actual: '-', forecast: '0.3%', previous: '0.2%', desc: 'Change in the price of finished goods and services sold by producers.' },
-      { date: '2026-05-13', time: '08:30', currency: 'USD', impact: 'high', event: 'CPI m/m', actual: '-', forecast: '0.4%', previous: '0.4%', desc: 'Change in the price of goods and services purchased by consumers.' },
-      { date: '2026-05-13', time: '08:30', currency: 'USD', impact: 'high', event: 'CPI y/y', actual: '-', forecast: '3.4%', previous: '3.5%', desc: 'Year-over-year change in consumer prices.' },
-      { date: '2026-05-14', time: '08:30', currency: 'USD', impact: 'high', event: 'Retail Sales m/m', actual: '-', forecast: '0.4%', previous: '0.7%', desc: 'Change in the total value of sales at the retail level.' },
-      { date: '2026-05-14', time: '08:30', currency: 'USD', impact: 'high', event: 'Core Retail Sales m/m', actual: '-', forecast: '0.2%', previous: '1.1%', desc: 'Change in the value of sales at the retail level, excluding autos.' },
-      { date: '2026-05-15', time: '10:00', currency: 'USD', impact: 'medium', event: 'UoM Consumer Sentiment', actual: '-', forecast: '76.2', previous: '77.9', desc: 'Survey of consumer confidence levels in the US.' },
-    ];
-    return allEvents;
+    // Shared events from BankForecast or similar
+    const week1Raw = [
+      // Current Week (Template)
+      { day: 0, time: '09:30', currency: 'AUD', impact: 'medium', event: 'ANZ Job Advertisements', actual: '1.2%', forecast: '0.8%', previous: '-1.5%', desc: 'Measure of the change in the number of jobs advertised.' },
+      { day: 1, time: '04:30', currency: 'GBP', impact: 'medium', event: 'Final Services PMI', actual: '53.4', forecast: '53.1', previous: '53.1', desc: 'Economic health of the services sector.' },
+      { day: 1, time: '10:00', currency: 'USD', impact: 'high', event: 'ISM Services PMI', actual: '52.8', forecast: '52.0', previous: '51.4', desc: 'Survey of purchasing managers in the services industry.' },
+      { day: 2, time: '08:15', currency: 'USD', impact: 'high', event: 'ADP Non-Farm Employment Change', actual: '188K', forecast: '175K', previous: '184K', desc: 'Estimate of the change in the number of employed people.' },
+      { day: 2, time: '10:30', currency: 'USD', impact: 'medium', event: 'Crude Oil Inventories', actual: '-1.4M', forecast: '-1.1M', previous: '7.3M', desc: 'Change in the number of barrels of crude oil held in inventory.' },
+      { day: 3, time: '07:00', currency: 'GBP', impact: 'high', event: 'Official Bank Rate', actual: '5.25%', forecast: '5.25%', previous: '5.25%', desc: 'Interest rate at which the BoE lends to financial institutions.' },
+      { day: 3, time: '08:30', currency: 'USD', impact: 'high', event: 'Unemployment Claims', actual: '212K', forecast: '215K', previous: '208K', desc: 'Number of individuals who filed for unemployment insurance.' },
+      { day: 4, time: '08:30', currency: 'USD', impact: 'high', event: 'Non-Farm Employment Change', actual: '-', forecast: '243K', previous: '303K', desc: 'Change in the number of employed people during the previous month.' },
+      { day: 4, time: '08:30', currency: 'USD', impact: 'high', event: 'Unemployment Rate', actual: '-', forecast: '3.8%', previous: '3.8%', desc: 'Percentage of the total work force that is unemployed.' },
+      { day: 5, time: '09:00', currency: 'CAD', impact: 'low', event: 'BOC Gov Macklem Speaks', actual: '-', forecast: '-', previous: '-', desc: 'Speech by the Governor of the Bank of Canada.' },
+    ].map(e => ({ ...e, date: getDaysDate(startOfThisWeek, e.day) }));
+
+    const week2Raw = [
+      // Next Week (Template)
+      { day: 0, time: '08:30', currency: 'USD', impact: 'low', event: 'NY Empire State Manufacturing Index', actual: '-', forecast: '-5.2', previous: '-14.3', desc: 'Manufacturing conditions in New York State.' },
+      { day: 1, time: '08:30', currency: 'USD', impact: 'high', event: 'PPI m/m', actual: '-', forecast: '0.3%', previous: '0.2%', desc: 'Change in the price of finished goods and services sold by producers.' },
+      { day: 2, time: '08:30', currency: 'USD', impact: 'high', event: 'CPI m/m', actual: '-', forecast: '0.4%', previous: '0.4%', desc: 'Change in the price of goods and services purchased by consumers.' },
+      { day: 2, time: '08:30', currency: 'USD', impact: 'high', event: 'CPI y/y', actual: '-', forecast: '3.4%', previous: '3.5%', desc: 'Year-over-year change in consumer prices.' },
+      { day: 3, time: '08:30', currency: 'USD', impact: 'high', event: 'Retail Sales m/m', actual: '-', forecast: '0.4%', previous: '0.7%', desc: 'Change in the total value of sales at the retail level.' },
+      { day: 3, time: '08:30', currency: 'USD', impact: 'high', event: 'Core Retail Sales m/m', actual: '-', forecast: '0.2%', previous: '1.1%', desc: 'Change in the value of sales at the retail level, excluding autos.' },
+      { day: 4, time: '10:00', currency: 'USD', impact: 'medium', event: 'UoM Consumer Sentiment', actual: '-', forecast: '76.2', previous: '77.9', desc: 'Survey of consumer confidence levels in the US.' },
+    ].map(e => ({ ...e, date: getDaysDate(startOfNextWeek, e.day) }));
+
+    return [...week1Raw, ...week2Raw];
   }, []);
 
   const convertTime = (timeEST: string, targetTz: 'EST' | 'PHT') => {
