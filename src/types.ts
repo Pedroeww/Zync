@@ -50,6 +50,9 @@ export interface UserSettings {
   theme: 'night' | 'light' | 'midnight' | 'obsidian' | 'slate' | 'forest' | 'abyss' | 'carbon';
   hidePnL: boolean;
   profileNameLastChanged: string | null;
+  checklistTargetAmount?: number;
+  checklistTargetPeriod?: 'daily' | 'weekly' | 'monthly' | 'yearly' | 'overall';
+  checklistTargetType?: 'profit' | 'discipline';
 }
 
 export interface Account {
