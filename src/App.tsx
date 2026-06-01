@@ -3239,6 +3239,94 @@ const Analytics = ({ trades, currency, hidePnL, user, profileName, onUpdateTrade
     return { winRate, lossRate, avgWin, avgLoss, profitFactor, total };
   }, [trades]);
 
+  const [simulatedLossRate, setSimulatedLossRate] = useState<number>(50);
+
+  useEffect(() => {
+    if (analyticsStats.lossRate > 0) {
+      setSimulatedLossRate(Math.round(analyticsStats.lossRate * 10) / 10);
+    }
+  }, [analyticsStats.lossRate]);
+
+  const streakStats = useMemo(() => {
+    const sortedChronologically = [...trades].sort((a, b) => new Date(a.entryDate || a.exitDate).getTime() - new Date(b.entryDate || b.exitDate).getTime());
+    
+    let maxLosingStreak = 0;
+    let currentLosingStreak = 0;
+    let activeStreak = 0;
+
+    sortedChronologically.forEach(t => {
+      if (t.pnl < 0) {
+        activeStreak++;
+        if (activeStreak > maxLosingStreak) {
+          maxLosingStreak = activeStreak;
+        }
+      } else if (t.pnl > 0) {
+        activeStreak = 0;
+      }
+    });
+
+    for (let i = sortedChronologically.length - 1; i >= 0; i--) {
+      if (sortedChronologically[i].pnl < 0) {
+        currentLosingStreak++;
+      } else if (sortedChronologically[i].pnl > 0) {
+        break;
+      } else {
+        break;
+      }
+    }
+
+    return { maxLosingStreak, currentLosingStreak };
+  }, [trades]);
+
+  const streakProbabilities = useMemo(() => {
+    const q = simulatedLossRate / 100;
+    const p = 1 - q;
+    const N = 50;
+    const data = [];
+
+    // Include the user's max losing streak if it's larger than 10 so it's always in the range
+    const maxBound = Math.max(10, streakStats.maxLosingStreak + 1);
+
+    for (let X = 2; X <= maxBound; X++) {
+      let dp = new Array(X).fill(0);
+      dp[0] = 1.0;
+
+      for (let step = 0; step < N; step++) {
+        const nextDp = new Array(X).fill(0);
+        let sum = 0;
+        for (let j = 0; j < X; j++) {
+          sum += dp[j];
+        }
+        nextDp[0] = sum * p;
+
+        for (let j = 0; j < X - 1; j++) {
+          nextDp[j + 1] = dp[j] * q;
+        }
+        dp = nextDp;
+      }
+
+      let probNotReached = 0;
+      for (let j = 0; j < X; j++) {
+        probNotReached += dp[j];
+      }
+
+      const probReached = Math.max(0, Math.min(1.0, 1.0 - probNotReached));
+      
+      const isUserMaxStreak = streakStats.maxLosingStreak === X;
+      const isUserCurrentStreak = streakStats.currentLosingStreak === X;
+
+      data.push({
+        streak: `${X} Losses`,
+        streakNum: X,
+        probability: Math.round(probReached * 1000) / 10,
+        isUserMaxStreak,
+        isUserCurrentStreak,
+      });
+    }
+
+    return data;
+  }, [simulatedLossRate, streakStats]);
+
   return (
     <div className="space-y-12 pb-20">
       <ScrollAnimatedSection>
@@ -3500,6 +3588,263 @@ const Analytics = ({ trades, currency, hidePnL, user, profileName, onUpdateTrade
           </div>
         </div>
       </div>
+      </ScrollAnimatedSection>
+
+      {/* Dynamic Drawdown & Streak Probability Matrix */}
+      <ScrollAnimatedSection delay={0.15}>
+        <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-3xl relative overflow-hidden group">
+          {/* Decorative ambient gradient */}
+          <div className="absolute top-0 right-0 -mr-24 -mt-24 w-80 h-80 bg-rose-500/5 blur-[120px] rounded-full" />
+          
+          <div className="relative z-10">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-8">
+              <div>
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-10 h-10 rounded-2xl bg-rose-500 flex items-center justify-center shadow-lg shadow-rose-500/20">
+                    <Activity className="w-5 h-5 text-white" />
+                  </div>
+                  <h3 className="text-xl md:text-2xl font-black text-white tracking-tighter uppercase">
+                    Streak & Drawdown <span className="text-rose-400">Probability Model</span>
+                  </h3>
+                </div>
+                <p className="text-zinc-500 max-w-xl text-xs leading-relaxed uppercase tracking-tight">
+                  Probability of experiencing at least <span className="text-zinc-300 font-bold">X consecutive losing trades</span> within a 50-trade sample, modeled on binomial run distributions.
+                </p>
+              </div>
+
+              {/* Reset to actual loss rate button */}
+              <div className="flex items-center gap-3 bg-zinc-950 border border-zinc-850 p-3.5 rounded-2xl">
+                <div className="space-y-0.5">
+                  <p className="text-[9px] font-black uppercase text-zinc-500 tracking-wider">Modeling Base</p>
+                  <p className="text-xs font-mono font-bold text-zinc-350">
+                    {simulatedLossRate.toFixed(1)}% Loss Rate ({ (100 - simulatedLossRate).toFixed(1) }% WR)
+                  </p>
+                </div>
+                {Math.abs(simulatedLossRate - analyticsStats.lossRate) > 0.1 && (
+                  <button
+                    type="button"
+                    onClick={() => setSimulatedLossRate(Math.round(analyticsStats.lossRate * 10) / 10)}
+                    className="px-3 py-1.5 bg-zinc-900 hover:bg-zinc-800 hover:text-white border border-zinc-850 rounded-xl text-[9px] uppercase font-black text-indigo-400 transition-all font-mono"
+                    title="Load real historical loss rate from your journal"
+                  >
+                    Use Live Link ({analyticsStats.lossRate.toFixed(1)}%)
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              {/* Left 2 Cols: The Chart */}
+              <div className="lg:col-span-2 space-y-4">
+                <div className="bg-zinc-950/40 border border-zinc-850/60 rounded-2xl p-6">
+                  <div className="h-64 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={streakProbabilities} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" opacity={0.3} vertical={false} />
+                        <XAxis 
+                          dataKey="streak" 
+                          stroke="#71717a" 
+                          fontSize={9} 
+                          fontWeight="bold"
+                          axisLine={false} 
+                          tickLine={false} 
+                        />
+                        <YAxis 
+                          stroke="#71717a" 
+                          fontSize={9} 
+                          axisLine={false} 
+                          tickLine={false}
+                          domain={[0, 100]}
+                          tickFormatter={(v) => `${v}%`}
+                        />
+                        <Tooltip
+                          cursor={{ fill: 'rgba(255, 255, 255, 0.02)' }}
+                          content={({ active, payload }) => {
+                            if (active && payload && payload.length) {
+                              const data = payload[0].payload;
+                              return (
+                                <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-4 shadow-2xl space-y-2">
+                                  <p className="text-[10px] font-black uppercase text-zinc-500 tracking-wider">
+                                    {data.streakNum} Consecutive Losses
+                                  </p>
+                                  <div className="flex items-baseline gap-1.5">
+                                    <span className="text-base font-mono font-black text-white">{data.probability}%</span>
+                                    <span className="text-[9px] text-zinc-550 font-bold uppercase">Probability</span>
+                                  </div>
+                                  <p className="text-[9px] text-zinc-400 leading-normal max-w-[200px]">
+                                    At a {simulatedLossRate.toFixed(1)}% loss rate, there is a {data.probability}% chance of getting {data.streakNum} or more losses in a row in any 50-trade period.
+                                  </p>
+                                  {data.isUserMaxStreak && (
+                                    <span className="inline-block mt-1 px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 text-[8px] font-black uppercase tracking-wider">
+                                      Your Max Historical Streak
+                                    </span>
+                                  )}
+                                  {data.isUserCurrentStreak && (
+                                    <span className="inline-block mt-1 px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[8px] font-black uppercase tracking-wider">
+                                      Your Current Active Streak
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            }
+                            return null;
+                          }}
+                        />
+                        <Bar dataKey="probability" radius={[6, 6, 0, 0]}>
+                          {streakProbabilities.map((entry, index) => {
+                            let fill = '#27272a'; // zinc-800
+                            let stroke = 'transparent';
+                            let glowClass = false;
+                            
+                            if (entry.isUserMaxStreak) {
+                              fill = '#6366f1'; // indigo-500
+                              stroke = '#818cf8';
+                              glowClass = true;
+                            } else if (entry.isUserCurrentStreak) {
+                              fill = '#f59e0b'; // amber-500
+                              stroke = '#fbbf24';
+                              glowClass = true;
+                            }
+                            
+                            return (
+                              <Cell 
+                                key={`cell-${index}`} 
+                                fill={fill}
+                                stroke={stroke}
+                                strokeWidth={glowClass ? 1 : 0}
+                                style={glowClass ? {
+                                  filter: 'drop-shadow(0 0 6px rgba(99, 102, 241, 0.4))'
+                                } : {}}
+                              />
+                            );
+                          })}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right 1 Col: Controls and Indicators */}
+              <div className="space-y-5">
+                {/* Simulated Loss Rate Slider */}
+                <div className="bg-zinc-950/40 border border-zinc-850/60 rounded-2xl p-5 space-y-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] font-black uppercase text-zinc-500 tracking-wider flex items-center gap-1.5">
+                      <SettingsIcon className="w-3.5 h-3.5 text-zinc-550" /> Interactive Simulator
+                    </span>
+                    <span className="text-xs font-mono font-bold text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded-lg border border-rose-500/20">
+                      Loss: {simulatedLossRate}%
+                    </span>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <input
+                      type="range"
+                      min="5"
+                      max="95"
+                      step="1"
+                      value={simulatedLossRate}
+                      onChange={(e) => setSimulatedLossRate(Number(e.target.value))}
+                      className="w-full accent-indigo-500 cursor-pointer h-1.5 bg-zinc-800 rounded-lg appearance-none"
+                    />
+                    <div className="flex justify-between text-[8px] font-black uppercase tracking-widest text-zinc-650 font-mono">
+                      <span>95% WR</span>
+                      <span>50/50</span>
+                      <span>5% WR</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Lighted up states panel */}
+                <div className="bg-zinc-950/40 border border-zinc-850/60 rounded-2xl p-5 space-y-4">
+                  <span className="text-[10px] font-black uppercase text-zinc-500 tracking-wider block">
+                    Your Live Streak Profile
+                  </span>
+
+                  <div className="space-y-2.5">
+                    {/* Max Streak Indicator */}
+                    <div className={cn(
+                      "p-3 rounded-xl border transition-all flex justify-between items-center",
+                      streakStats.maxLosingStreak > 0
+                        ? "bg-indigo-500/5 border-indigo-500/20"
+                        : "bg-zinc-900/20 border-zinc-850/50"
+                    )}>
+                      <div>
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <span className="w-2 h-2 rounded-full bg-indigo-500 shadow-[0_0_8px_#6366f1]" />
+                          <span className="text-[10px] font-black uppercase tracking-wide text-zinc-300">
+                            Max Loss Streak
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-zinc-500 leading-normal">
+                          Your record consecutive loss count.
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-lg font-mono font-black text-indigo-400">
+                          {streakStats.maxLosingStreak}x
+                        </p>
+                        <p className="text-[8px] font-mono font-semibold text-zinc-400">
+                          {streakStats.maxLosingStreak >= 2 ? (
+                            `Prob: ${(() => {
+                              const match = streakProbabilities.find(p => p.streakNum === streakStats.maxLosingStreak);
+                              return match ? `${match.probability}%` : 'N/A';
+                            })()}`
+                          ) : (
+                            'N/A (<2)'
+                          )}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Current Active Streak Indicator */}
+                    <div className={cn(
+                      "p-3 rounded-xl border transition-all flex justify-between items-center",
+                      streakStats.currentLosingStreak > 0
+                        ? "bg-amber-500/5 border-amber-500/20"
+                        : "bg-zinc-900/20 border-zinc-850/50"
+                    )}>
+                      <div>
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <span className="w-2 h-2 rounded-full bg-amber-500 shadow-[0_0_8px_#f59e0b]" />
+                          <span className="text-[10px] font-black uppercase tracking-wide text-zinc-300">
+                            Active Loss Streak
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-zinc-500 leading-normal">
+                          Your active ongoing loss count.
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-lg font-mono font-black text-amber-500">
+                          {streakStats.currentLosingStreak}x
+                        </p>
+                        <p className="text-[8px] font-mono font-semibold text-zinc-400">
+                          {streakStats.currentLosingStreak >= 2 ? (
+                            `Prob: ${(() => {
+                              const match = streakProbabilities.find(p => p.streakNum === streakStats.currentLosingStreak);
+                              return match ? `${match.probability}%` : 'N/A';
+                            })()}`
+                          ) : (
+                            'N/A (<2)'
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Statistical Note */}
+                <div className="p-4 bg-zinc-950/20 rounded-2xl border border-dashed border-zinc-850/60">
+                  <p className="text-[9px] text-zinc-500 leading-normal uppercase tracking-tight">
+                    💡 <span className="font-bold text-zinc-400">The Streak Fallacy:</span> Over 50 trades, any strategy with a 50% Win Rate has an <span className="text-white font-bold">81.3% probability</span> of seeing at least 4 losses in a row. It is mathematically standard. Do not abandon an edge over standard variance.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </ScrollAnimatedSection>
 
       {/* Dive into Strategy Section */}
