@@ -484,18 +484,18 @@ export function FundingSuiteTab({ settings, onUpdateSettings }: FundingSuiteTabP
   return (
     <div className="space-y-6 pb-12">
       {/* Premium Header Bannerized */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-zinc-900 via-zinc-950 to-rose-950/20 border border-zinc-800 p-6 md:p-8">
-        <div className="absolute right-0 top-0 w-[400px] h-[400px] bg-rose-500/5 rounded-full blur-3xl pointer-events-none" />
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-zinc-900 via-zinc-950 to-indigo-950/20 border border-zinc-800 p-6 md:p-8">
+        <div className="absolute right-0 top-0 w-[400px] h-[400px] bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
         <div className="relative z-10 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
           <div className="space-y-2">
             <div className="flex items-center gap-2">
-              <span className="px-2.5 py-1 rounded-full bg-rose-500/10 text-rose-400 text-[10px] uppercase font-black tracking-widest border border-rose-500/20">
+              <span className="px-2.5 py-1 rounded-full bg-indigo-500/10 text-indigo-400 text-[10px] uppercase font-black tracking-widest border border-indigo-500/20">
                 PRO LAB & COMPENSATORY ENGINE
               </span>
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
             </div>
             <h1 className="text-2xl md:text-3xl font-black text-white uppercase tracking-tighter">
-              Funding <span className="text-rose-450">&amp; Live Broker</span> Suite
+              Funding <span className="text-indigo-400">&amp; Live Broker</span> Suite
             </h1>
             <p className="text-zinc-400 text-xs md:text-sm max-w-2xl leading-relaxed">
               Equip your trading system with calibrated safety buffers, risk metrics, and country-tailored payout parameters. 
@@ -512,7 +512,7 @@ export function FundingSuiteTab({ settings, onUpdateSettings }: FundingSuiteTabP
               className={cn(
                 "flex-1 sm:flex-initial px-4 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 whitespace-nowrap",
                 accountMode === 'funded'
-                  ? "bg-rose-500 text-white shadow-lg shadow-rose-500/20"
+                  ? "bg-indigo-500 text-white shadow-lg shadow-indigo-500/20"
                   : "text-zinc-500 hover:text-zinc-200"
               )}
             >
@@ -527,7 +527,7 @@ export function FundingSuiteTab({ settings, onUpdateSettings }: FundingSuiteTabP
               className={cn(
                 "flex-1 sm:flex-initial px-4 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 whitespace-nowrap",
                 accountMode === 'live'
-                  ? "bg-rose-500 text-white shadow-lg shadow-rose-500/20"
+                  ? "bg-indigo-500 text-white shadow-lg shadow-indigo-500/20"
                   : "text-zinc-500 hover:text-zinc-200"
               )}
             >
@@ -545,14 +545,14 @@ export function FundingSuiteTab({ settings, onUpdateSettings }: FundingSuiteTabP
         <div className="lg:col-span-4 bg-zinc-900 border border-zinc-800 rounded-3xl p-6 space-y-6">
           <div className="flex items-center justify-between border-b border-zinc-800 pb-4">
             <div className="flex items-center gap-2">
-              <Sliders className="w-4 h-4 text-rose-500" />
+              <Sliders className="w-4 h-4 text-indigo-500" />
               <h2 className="text-xs uppercase font-extrabold text-white tracking-widest font-mono">
                 Engine Settings
               </h2>
             </div>
             <span className={cn(
               "text-xs font-bold font-mono uppercase px-2.5 py-1 rounded",
-              accountMode === 'funded' ? "bg-rose-500/10 text-rose-400" : "bg-emerald-500/10 text-emerald-400"
+              accountMode === 'funded' ? "bg-indigo-500/10 text-indigo-400" : "bg-emerald-500/10 text-emerald-400"
             )}>
               {accountMode === 'funded' ? "Prop account" : "Personal cash"}
             </span>
@@ -567,7 +567,7 @@ export function FundingSuiteTab({ settings, onUpdateSettings }: FundingSuiteTabP
               <button
                 type="button"
                 onClick={() => setCustomBalance(settings.startingBalance || 50000)}
-                className="text-xs text-zinc-400 hover:text-rose-400 transition-all font-bold uppercase tracking-wider"
+                className="text-xs text-zinc-400 hover:text-indigo-400 transition-all font-bold uppercase tracking-wider"
               >
                 Sync Settings
               </button>
@@ -581,7 +581,7 @@ export function FundingSuiteTab({ settings, onUpdateSettings }: FundingSuiteTabP
                 type="number"
                 value={customBalance}
                 onChange={(e) => setCustomBalance(Math.max(10, Number(e.target.value)))}
-                className="w-full pl-14 pr-4 py-3 bg-zinc-950 border border-zinc-850 rounded-2xl text-white font-mono text-sm focus:outline-none focus:border-rose-500/40 transition-all font-bold"
+                className="w-full pl-14 pr-4 py-3 bg-zinc-950 border border-zinc-850 rounded-2xl text-white font-mono text-sm focus:outline-none focus:border-indigo-500/40 transition-all font-bold"
               />
             </div>
 
@@ -595,7 +595,7 @@ export function FundingSuiteTab({ settings, onUpdateSettings }: FundingSuiteTabP
                   className={cn(
                     "py-1.5 rounded-xl border text-xs font-mono font-bold transition-all",
                     customBalance === amt
-                      ? "bg-rose-500/10 border-rose-500 text-rose-450"
+                      ? "bg-indigo-500/10 border-indigo-500 text-indigo-400"
                       : "bg-zinc-950 border-zinc-850 text-zinc-400 hover:text-zinc-200"
                   )}
                 >
@@ -624,7 +624,7 @@ export function FundingSuiteTab({ settings, onUpdateSettings }: FundingSuiteTabP
                   className={cn(
                     "p-2.5 rounded-xl border text-left transition-all flex flex-col justify-between h-16",
                     tradingStyle === style.id
-                      ? "bg-rose-500/5 border-rose-500 text-rose-400"
+                      ? "bg-indigo-500/5 border-indigo-500 text-indigo-400"
                       : "bg-zinc-950 border-zinc-850 text-zinc-400 hover:border-zinc-800 hover:text-zinc-200"
                   )}
                 >
@@ -646,13 +646,13 @@ export function FundingSuiteTab({ settings, onUpdateSettings }: FundingSuiteTabP
             </div>
             <div className="flex justify-between items-center text-zinc-350 border-b border-zinc-900/60 pb-1.5 font-mono">
               <span>Risk Recommendation:</span>
-              <span className={cn("font-bold", accountMode === 'funded' ? "text-rose-450" : "text-emerald-400")}>
+              <span className={cn("font-bold", accountMode === 'funded' ? "text-indigo-400" : "text-emerald-400")}>
                 {metrics.baseRiskPct}% ({formatCurrency(metrics.recommendedRiskAmount, settings.currency)})
               </span>
             </div>
             <div className="flex justify-between items-center text-zinc-350 font-mono">
               <span className="truncate">Limit Capacity:</span>
-              <span className="text-rose-500 font-bold">-{metrics.dailyDrawdownPct}% Daily Threshold</span>
+              <span className="text-indigo-400 font-bold">-{metrics.dailyDrawdownPct}% Daily Threshold</span>
             </div>
           </div>
         </div>
@@ -674,7 +674,7 @@ export function FundingSuiteTab({ settings, onUpdateSettings }: FundingSuiteTabP
                 className={cn(
                   "flex-1 py-3 px-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2",
                   activeTab === tab.id
-                    ? "bg-rose-500/10 text-rose-450 border border-rose-500/25"
+                    ? "bg-indigo-500/10 text-indigo-400 border border-indigo-500/25"
                     : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/40 border border-transparent"
                 )}
               >
@@ -712,23 +712,23 @@ export function FundingSuiteTab({ settings, onUpdateSettings }: FundingSuiteTabP
                         {formatPercent(metrics.baseRiskPct / 100)} Risk Target
                       </p>
                       <p className="text-xs text-zinc-300 mt-1.5 font-mono font-medium">
-                        Base risk: <span className="text-rose-455 font-bold">{formatCurrency(metrics.recommendedRiskAmount, settings.currency)}</span> cash risk budget.
+                        Base risk: <span className="text-indigo-400 font-bold">{formatCurrency(metrics.recommendedRiskAmount, settings.currency)}</span> cash risk budget.
                       </p>
                     </div>
 
                     {/* Daily drawdown limit */}
                     <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-5 relative overflow-hidden">
                       <div className="absolute right-0 top-0 p-3 text-zinc-850 pointer-events-none">
-                        <AlertTriangle className="w-10 h-10 stroke-1 text-zinc-800" />
+                        <AlertTriangle className="w-10 h-10 stroke-1 text-zinc-850" />
                       </div>
-                      <p className="text-xs font-bold text-rose-450 uppercase tracking-widest font-mono mb-1">
+                      <p className="text-xs font-bold text-indigo-400 uppercase tracking-widest font-mono mb-1">
                         {accountMode === 'funded' ? "Daily Hard Stop threshold" : "Emergency Daily Drawdown limit"}
                       </p>
-                      <p className="text-lg font-mono font-black text-rose-400">
+                      <p className="text-lg font-mono font-black text-indigo-400">
                         {formatCurrency(metrics.dailyLossLimitVal, settings.currency)}
                       </p>
                       <p className="text-xs text-zinc-300 mt-1.5 font-mono font-medium">
-                        System hard cap of <span className="text-rose-450 font-bold">{metrics.dailyDrawdownPct}%</span> budget per session.
+                        System hard cap of <span className="text-indigo-400 font-bold">{metrics.dailyDrawdownPct}%</span> budget per session.
                       </p>
                     </div>
 
@@ -740,11 +740,11 @@ export function FundingSuiteTab({ settings, onUpdateSettings }: FundingSuiteTabP
                       <p className="text-xs font-bold text-zinc-400 uppercase tracking-widest font-mono mb-1">
                         {accountMode === 'funded' ? "Total Prop Max Limit" : "Total Personal Capital Cap"}
                       </p>
-                      <p className="text-lg font-mono font-black text-rose-500">
+                      <p className="text-lg font-mono font-black text-indigo-400">
                         {formatCurrency(metrics.maxDrawdownVal, settings.currency)}
                       </p>
                       <p className="text-xs text-zinc-300 mt-1.5 font-mono font-medium">
-                        System fails if account drops beneath <span className="text-rose-500 font-bold">{metrics.maxDrawdownPct}%</span> block value.
+                        System fails if account drops beneath <span className="text-indigo-400 font-bold">{metrics.maxDrawdownPct}%</span> block value.
                       </p>
                     </div>
                   </div>
@@ -754,7 +754,7 @@ export function FundingSuiteTab({ settings, onUpdateSettings }: FundingSuiteTabP
                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-zinc-800 pb-4">
                       <div>
                         <h3 className="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
-                          <Calculator className="w-4 h-4 text-rose-400 shrink-0" />
+                          <Calculator className="w-4 h-4 text-indigo-400 shrink-0" />
                           Position Size & Lot Capacity calculator
                         </h3>
                         <p className="text-zinc-400 text-xs uppercase font-mono tracking-wider mt-1">
@@ -769,7 +769,7 @@ export function FundingSuiteTab({ settings, onUpdateSettings }: FundingSuiteTabP
                           onClick={() => setCalculatorCategory('Forex')}
                           className={cn(
                             "px-3 py-1 rounded-lg text-xs font-mono font-bold uppercase transition-all",
-                            calculatorCategory === 'Forex' ? "bg-rose-500/10 text-rose-400 border border-rose-500/20" : "text-zinc-400 hover:text-zinc-200"
+                            calculatorCategory === 'Forex' ? "bg-indigo-500/10 text-indigo-400 border border-indigo-500/20" : "text-zinc-400 hover:text-zinc-200"
                           )}
                         >
                           Forex Lots
@@ -779,7 +779,7 @@ export function FundingSuiteTab({ settings, onUpdateSettings }: FundingSuiteTabP
                           onClick={() => setCalculatorCategory('Futures')}
                           className={cn(
                             "px-3 py-1 rounded-lg text-xs font-mono font-bold uppercase transition-all",
-                            calculatorCategory === 'Futures' ? "bg-rose-500/10 text-rose-400 border border-rose-500/20" : "text-zinc-400 hover:text-zinc-200"
+                            calculatorCategory === 'Futures' ? "bg-indigo-500/10 text-indigo-400 border border-indigo-500/20" : "text-zinc-400 hover:text-zinc-200"
                           )}
                         >
                           Futures Contracts
@@ -795,7 +795,7 @@ export function FundingSuiteTab({ settings, onUpdateSettings }: FundingSuiteTabP
                         <div className="space-y-2">
                           <div className="flex justify-between text-xs text-zinc-300 font-extrabold uppercase tracking-wider font-mono">
                             <span>Trade Sequence Risk (%)</span>
-                            <span className="text-rose-400 font-bold">{riskPercentage}% Risk</span>
+                            <span className="text-indigo-400 font-bold">{riskPercentage}% Risk</span>
                           </div>
                           <input
                             type="range"
@@ -804,7 +804,7 @@ export function FundingSuiteTab({ settings, onUpdateSettings }: FundingSuiteTabP
                             step="0.05"
                             value={riskPercentage}
                             onChange={(e) => setRiskPercentage(Number(e.target.value))}
-                            className="w-full accent-rose-500 cursor-pointer h-1.5 bg-zinc-950 rounded-lg appearance-none"
+                            className="w-full accent-indigo-500 cursor-pointer h-1.5 bg-zinc-950 rounded-lg appearance-none"
                           />
                           <div className="flex justify-between text-xs font-mono text-zinc-400">
                             <span>0.1% (Safe passing)</span>
@@ -823,7 +823,7 @@ export function FundingSuiteTab({ settings, onUpdateSettings }: FundingSuiteTabP
                             type="number"
                             value={stopLossPips}
                             onChange={(e) => setStopLossPips(Math.max(1, Number(e.target.value)))}
-                            className="w-full px-4 py-2 bg-zinc-950 border border-zinc-850 rounded-xl text-white font-mono text-xs focus:outline-none focus:border-rose-500/30"
+                            className="w-full px-4 py-2 bg-zinc-950 border border-zinc-850 rounded-xl text-white font-mono text-xs focus:outline-none focus:border-indigo-500/30"
                           />
                           <p className="text-xs text-zinc-400 leading-normal font-mono uppercase">
                             * {calculatorCategory === 'Futures' ? 'Standard Micro tick values computed at $1.25 MES / $12.50 ES standard' : 'Assumed standard major pair multiplier of $10 per pip per full lots'}
@@ -845,7 +845,7 @@ export function FundingSuiteTab({ settings, onUpdateSettings }: FundingSuiteTabP
                                   <p className="text-xs font-extrabold text-zinc-300 uppercase font-mono">E-Mini Contracts Cap</p>
                                   <p className="text-xs text-zinc-400 font-mono mt-0.5">Standard ES / NQ Indices / Crude Oil</p>
                                 </div>
-                                <p className="text-xl font-mono font-black text-rose-400">{calculatedFuturesContracts.minis} Minis</p>
+                                <p className="text-xl font-mono font-black text-indigo-400">{calculatedFuturesContracts.minis} Minis</p>
                               </div>
                               <div className="flex items-center justify-between border-t border-zinc-850/60 pt-3">
                                 <div>
@@ -862,7 +862,7 @@ export function FundingSuiteTab({ settings, onUpdateSettings }: FundingSuiteTabP
                                   <p className="text-xs font-extrabold text-zinc-300 uppercase font-mono">Forex Standard Lots Cap</p>
                                   <p className="text-xs text-zinc-400 font-mono mt-0.5">Optimal fully standard lot position</p>
                                 </div>
-                                <p className="text-xl font-mono font-black text-rose-400">{calculatedLotSize} Lots</p>
+                                <p className="text-xl font-mono font-black text-indigo-400">{calculatedLotSize} Lots</p>
                               </div>
                               <div className="flex items-center justify-between border-t border-zinc-850/60 pt-3">
                                 <div>
@@ -877,12 +877,12 @@ export function FundingSuiteTab({ settings, onUpdateSettings }: FundingSuiteTabP
                           )}
                         </div>
 
-                        <div className="p-3.5 bg-rose-500/5 border border-rose-500/10 rounded-2xl space-y-1">
+                        <div className="p-3.5 bg-indigo-500/5 border border-indigo-500/10 rounded-2xl space-y-1">
                           <p className="text-xs font-extrabold text-zinc-200 uppercase font-mono block">
                             ⚠️ Sizing Risk Threshold Alert
                           </p>
                           <p className="text-xs text-zinc-300 leading-normal font-mono leading-relaxed">
-                            Risking over <span className="text-rose-400 font-bold">1.0%</span> triggers extreme sequence variance. Under funded rules, keeping single sequences below <span className="text-emerald-400 font-bold">0.5%</span> risk minimizes high liquidations.
+                            Risking over <span className="text-indigo-400 font-bold">1.0%</span> triggers extreme sequence variance. Under funded rules, keeping single sequences below <span className="text-emerald-400 font-bold">0.5%</span> risk minimizes high liquidations.
                           </p>
                         </div>
                       </div>
@@ -893,7 +893,7 @@ export function FundingSuiteTab({ settings, onUpdateSettings }: FundingSuiteTabP
                   {/* Style Avoidance Guard */}
                   <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6">
                     <div className="flex items-center gap-2 border-b border-zinc-800 pb-3 mb-4">
-                      <AlertOctagon className="w-4 h-4 text-rose-500" />
+                      <AlertOctagon className="w-4 h-4 text-indigo-500" />
                       <h3 className="text-xs font-black uppercase text-white tracking-widest font-mono">
                         Active Style Guard Guide: Things to Avoid
                       </h3>
@@ -902,8 +902,8 @@ export function FundingSuiteTab({ settings, onUpdateSettings }: FundingSuiteTabP
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {tradingStyle === 'scalper' && (
                         <>
-                          <div className="p-3.5 bg-zinc-950 rounded-2xl border border-rose-500/10 space-y-2">
-                            <div className="flex items-center gap-2 text-rose-450">
+                          <div className="p-3.5 bg-zinc-950 rounded-2xl border border-indigo-500/10 space-y-2">
+                            <div className="flex items-center gap-2 text-indigo-400">
                               <Clock className="w-4 h-4 shrink-0" />
                               <span className="text-xs font-bold uppercase tracking-wider font-mono">Red-Folder News release volatility</span>
                             </div>
@@ -926,8 +926,8 @@ export function FundingSuiteTab({ settings, onUpdateSettings }: FundingSuiteTabP
 
                       {tradingStyle === 'daytrader' && (
                         <>
-                          <div className="p-3.5 bg-zinc-950 rounded-2xl border border-rose-500/10 space-y-2">
-                            <div className="flex items-center gap-2 text-rose-450">
+                          <div className="p-3.5 bg-zinc-950 rounded-2xl border border-indigo-500/10 space-y-2">
+                            <div className="flex items-center gap-2 text-indigo-400">
                               <Target className="w-4 h-4 shrink-0" />
                               <span className="text-xs font-bold uppercase tracking-wider font-mono">Holdings Past Market Settlement times</span>
                             </div>
@@ -950,8 +950,8 @@ export function FundingSuiteTab({ settings, onUpdateSettings }: FundingSuiteTabP
 
                       {tradingStyle === 'swing' && (
                         <>
-                          <div className="p-3.5 bg-zinc-950 rounded-2xl border border-rose-500/10 space-y-2">
-                            <div className="flex items-center gap-2 text-rose-450">
+                          <div className="p-3.5 bg-zinc-950 rounded-2xl border border-indigo-500/10 space-y-2">
+                            <div className="flex items-center gap-2 text-indigo-400">
                               <AlertTriangle className="w-4 h-4 shrink-0" />
                               <span className="text-xs font-bold uppercase tracking-wider font-mono">Weekend market opening gaps</span>
                             </div>
@@ -974,8 +974,8 @@ export function FundingSuiteTab({ settings, onUpdateSettings }: FundingSuiteTabP
 
                       {tradingStyle === 'news' && (
                         <>
-                          <div className="p-3.5 bg-zinc-950 rounded-2xl border border-rose-500/10 space-y-2">
-                            <div className="flex items-center gap-2 text-rose-450">
+                          <div className="p-3.5 bg-zinc-950 rounded-2xl border border-indigo-500/10 space-y-2">
+                            <div className="flex items-center gap-2 text-indigo-400">
                               <AlertTriangle className="w-4 h-4 shrink-0" />
                               <span className="text-xs font-bold uppercase tracking-wider font-mono">Market orders on exact millisecond outputs</span>
                             </div>
@@ -1671,7 +1671,7 @@ export function FundingSuiteTab({ settings, onUpdateSettings }: FundingSuiteTabP
                       <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 space-y-6">
                         <div className="flex items-center justify-between border-b border-zinc-800 pb-4">
                           <div className="flex items-center gap-2">
-                            <Building className="w-4 h-4 text-rose-500 shrink-0" />
+                            <Building className="w-4 h-4 text-indigo-500 shrink-0" />
                             <h3 className="text-sm font-black text-white uppercase tracking-wider">
                               Philippine-Accessible Prop Platforms comparison
                             </h3>
@@ -1691,7 +1691,7 @@ export function FundingSuiteTab({ settings, onUpdateSettings }: FundingSuiteTabP
                               className={cn(
                                 "p-3.5 rounded-2xl border text-left transition-all flex flex-col justify-between h-24 relative overflow-hidden",
                                 platformId === plat.id
-                                  ? "bg-rose-500/5 border-rose-500 text-rose-455 shadow-md shadow-rose-500/5"
+                                  ? "bg-indigo-500/5 border-indigo-500 text-indigo-400 shadow-md shadow-indigo-500/5"
                                   : "bg-zinc-950 border-zinc-850 text-zinc-400 hover:border-zinc-805 hover:text-zinc-200"
                               )}
                             >
@@ -1718,7 +1718,7 @@ export function FundingSuiteTab({ settings, onUpdateSettings }: FundingSuiteTabP
                           <div className="flex items-center gap-3 border-b border-zinc-900 pb-3">
                             <span className="text-2xl">{selectedPlatform.logo}</span>
                             <div>
-                              <span className="text-xs font-black text-rose-400 uppercase tracking-wider block font-mono">
+                              <span className="text-xs font-black text-indigo-400 uppercase tracking-wider block font-mono">
                                 {selectedPlatform.name} Community Evaluation
                               </span>
                               <span className="text-[10px] text-zinc-400 font-mono block mt-1">
@@ -1730,7 +1730,7 @@ export function FundingSuiteTab({ settings, onUpdateSettings }: FundingSuiteTabP
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 font-mono text-xs text-zinc-300">
                             
                             <div className="p-4 bg-zinc-900/60 rounded-xl border border-zinc-850 space-y-1">
-                              <span className="text-xs font-black uppercase tracking-wider text-rose-400 block">
+                              <span className="text-xs font-black uppercase tracking-wider text-indigo-400 block">
                                 Local PH Availability &amp; ISP latency
                               </span>
                               <p className="leading-relaxed">
@@ -1798,7 +1798,7 @@ export function FundingSuiteTab({ settings, onUpdateSettings }: FundingSuiteTabP
                                 className={cn(
                                   "p-3.5 rounded-2xl border text-left transition-all flex flex-col justify-between h-24 relative overflow-hidden",
                                   isSelected
-                                    ? "bg-rose-500/5 border-rose-500 text-rose-455 shadow-md shadow-rose-500/5"
+                                    ? "bg-indigo-500/5 border-indigo-500 text-indigo-400 shadow-md shadow-indigo-500/5"
                                     : "bg-zinc-950 border-zinc-850 text-zinc-400 hover:border-zinc-805 hover:text-zinc-200"
                                 )}
                               >
@@ -1828,7 +1828,7 @@ export function FundingSuiteTab({ settings, onUpdateSettings }: FundingSuiteTabP
                           <div className="flex items-center gap-2 border-b border-zinc-900 pb-3">
                             <span className="text-2xl">{selectedBroker.logo}</span>
                             <div>
-                              <span className="text-xs font-black text-rose-400 uppercase tracking-wider block font-mono">
+                              <span className="text-xs font-black text-indigo-400 uppercase tracking-wider block font-mono">
                                 {selectedBroker.name} Specification Guide
                               </span>
                               <span className="text-[10px] text-zinc-400 font-mono block mt-1">
@@ -1841,7 +1841,7 @@ export function FundingSuiteTab({ settings, onUpdateSettings }: FundingSuiteTabP
                             
                             {/* general local corridor info */}
                             <div className="space-y-3 font-mono text-xs text-zinc-300">
-                              <span className="text-xs font-black uppercase tracking-wider text-rose-400 block">
+                              <span className="text-xs font-black uppercase tracking-wider text-indigo-400 block">
                                 Direct Local Deposit Gateway
                               </span>
                               <div className="p-4 bg-zinc-900/60 border border-zinc-850 rounded-xl">
@@ -1856,7 +1856,7 @@ export function FundingSuiteTab({ settings, onUpdateSettings }: FundingSuiteTabP
 
                             {/* sliders manual adjustment parameters */}
                             <div className="space-y-3 font-mono text-xs text-zinc-300">
-                              <span className="text-xs font-black uppercase tracking-wider text-rose-400 block font-mono">
+                              <span className="text-xs font-black uppercase tracking-wider text-indigo-400 block font-mono">
                                 Live Broker Manual Calibration Override
                               </span>
 
