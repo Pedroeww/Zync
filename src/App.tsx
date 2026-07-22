@@ -175,8 +175,6 @@ import { dataService } from './services/dataService';
 import { Trade, UserSettings, PlaybookItem, DashboardStats, MarketType, Side, EmotionalState, NewsImpact, ExitStatus, Account, User } from './types';
 import { MOCK_TRADES } from './constants';
 import ChecklistTab from './components/ChecklistTab';
-import InvestorPlanTab from './components/InvestorPlanTab';
-import { FundingSuiteTab } from './components/FundingSuiteTab';
 
 // --- Components ---
 
@@ -8980,8 +8978,6 @@ export default function App() {
             { id: 'execution', label: 'Execution' },
             { id: 'plan', label: 'My Plan' },
             { id: 'checklist', label: 'Checklist Rules' },
-            { id: 'portfolio', label: 'Portfolio Plan' },
-            { id: 'funding', label: 'Funding Suite', isNew: true },
             { id: 'analytics', label: 'Analytics' },
             { id: 'settings', label: 'Settings' },
           ].map((item) => (
@@ -9135,8 +9131,6 @@ export default function App() {
                     { id: 'execution', label: 'Execution', icon: History },
                     { id: 'plan', label: 'My Strategy', icon: Target },
                     { id: 'checklist', label: 'Checklist Rules', icon: CheckCircle2 },
-                    { id: 'portfolio', label: 'Portfolio Plan', icon: Wallet },
-                    { id: 'funding', label: 'Funding Suite', icon: Shield },
                     { id: 'analytics', label: 'Performance', icon: BarChart3 },
                     { id: 'settings', label: 'Settings', icon: SettingsIcon },
                   ].map((item) => (
@@ -9228,21 +9222,6 @@ export default function App() {
                     settings={settings} 
                     onUpdateSettings={handleUpdateSettings}
                     user={user}
-                  />
-                )}
-                {activeTab === 'portfolio' && (
-                  <InvestorPlanTab 
-                    currentAccountId={currentAccountId}
-                    accounts={accounts}
-                    trades={trades}
-                    startingBalance={settings.startingBalance}
-                    currency={settings.currency}
-                  />
-                )}
-                {activeTab === 'funding' && (
-                  <FundingSuiteTab 
-                    settings={settings}
-                    onUpdateSettings={handleUpdateSettings}
                   />
                 )}
                 {activeTab === 'analytics' && <Analytics trades={sortedTrades} currency={settings.currency} hidePnL={settings.hidePnL} user={user} profileName={settings.profileName} onUpdateTrade={handleUpdateTrade} />}
