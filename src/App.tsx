@@ -4972,8 +4972,11 @@ const Settings = ({
   onUpdateSettings,
   accounts,
   currentAccountId,
+  pinnedAccountId,
   onAddAccount,
   onSwitchAccount,
+  onSetDefaultAccount,
+  onRenameAccount,
   onDeleteAccount,
   user,
   onAuthComplete,
@@ -4983,8 +4986,11 @@ const Settings = ({
   onUpdateSettings: (s: UserSettings) => void,
   accounts: Account[],
   currentAccountId: string,
+  pinnedAccountId: string,
   onAddAccount: () => void,
   onSwitchAccount: (id: string) => void,
+  onSetDefaultAccount: (id: string) => void,
+  onRenameAccount: (id: string, name: string) => void,
   onDeleteAccount: (id: string) => void,
   user: User | null,
   onAuthComplete: (u: User) => void,
@@ -4994,6 +5000,15 @@ const Settings = ({
   const [tempProfileName, setTempProfileName] = useState(settings.profileName);
   const [showNameConfirm, setShowNameConfirm] = useState(false);
   const [showLogoutConfirmSettings, setShowLogoutConfirmSettings] = useState(false);
+  const [editingAccountId, setEditingAccountId] = useState<string | null>(null);
+  const [editNameValue, setEditNameValue] = useState('');
+
+  const handleSaveRename = (id: string) => {
+    if (editNameValue.trim()) {
+      onRenameAccount(id, editNameValue.trim());
+    }
+    setEditingAccountId(null);
+  };
 
   const lockPeriodHours = 720; // 30 days
   const lastChanged = settings.profileNameLastChanged ? new Date(settings.profileNameLastChanged) : null;
@@ -5107,65 +5122,169 @@ const Settings = ({
         </div>
       </div>
 
-      <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-xl shadow-xl">
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-xl font-bold text-zinc-100 font-serif tracking-tight">Account Management</h3>
-          <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">{accounts.length}/3 Accounts</span>
+      <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-xl shadow-xl space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <h3 className="text-xl font-bold text-zinc-100 font-serif tracking-tight flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5 text-emerald-400" />
+              Account Management & Persistence
+            </h3>
+            <p className="text-xs text-zinc-500 mt-1">Designate and lock your active account. Your selection remains permanently saved across logins, logouts, and restarts.</p>
+          </div>
+          <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest px-3 py-1 bg-zinc-950 border border-zinc-800 rounded-full self-start sm:self-auto">
+            {accounts.length}/3 Accounts
+          </span>
         </div>
+
+        {/* Lock Guarantee Banner */}
+        <div className="p-4 bg-emerald-500/5 border border-emerald-500/20 rounded-2xl flex items-start gap-3">
+          <Lock className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
+          <div className="text-xs space-y-1">
+            <p className="font-bold text-white flex items-center gap-2">
+              <span>Account Lock Active:</span>
+              <span className="text-emerald-400 font-mono">
+                {accounts.find(a => a.id === pinnedAccountId)?.name || accounts.find(a => a.id === currentAccountId)?.name || 'Primary Account'}
+              </span>
+            </p>
+            <p className="text-[11px] text-zinc-400 leading-relaxed">
+              This account is locked as your dedicated active profile. Logging out, clearing session, or reopening the app will <span className="text-emerald-300 font-semibold">never automatically revert</span> to another account unless you switch it here.
+            </p>
+          </div>
+        </div>
+
         <div className="space-y-3">
-          {accounts.map(account => (
-            <div 
-              key={account.id}
-              className={cn(
-                "p-4 rounded-2xl border flex items-center justify-between transition-all group",
-                currentAccountId === account.id 
-                  ? "bg-emerald-500/5 border-emerald-500/50 shadow-lg shadow-emerald-500/5" 
-                  : "bg-zinc-950 border-zinc-800 hover:border-zinc-700"
-              )}
-            >
-              <div className="flex items-center gap-4">
-                <div className={cn(
-                  "w-10 h-10 rounded-xl flex items-center justify-center font-black text-xs",
-                  currentAccountId === account.id ? "bg-emerald-500 text-black" : "bg-zinc-900 text-zinc-500"
-                )}>
-                  {account.name.charAt(0)}
-                </div>
-                <div>
-                  <p className={cn("text-xs font-bold", currentAccountId === account.id ? "text-white" : "text-zinc-400")}>{account.name}</p>
-                  <p className="text-[10px] text-zinc-500">{account.settings.profileName} • {account.trades.length} trades</p>
-                </div>
-              </div>
-              <div className="flex gap-2">
-                {currentAccountId !== account.id ? (
-                  <button 
-                    onClick={() => onSwitchAccount(account.id)}
-                    className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
-                  >
-                    Switch
-                  </button>
-                ) : (
-                  <div className="px-4 py-2 bg-emerald-500 text-black rounded-xl text-[10px] font-black uppercase tracking-widest">
-                    Active
+          {accounts.map(account => {
+            const isActive = currentAccountId === account.id;
+            const isPinned = pinnedAccountId === account.id;
+            const isEditing = editingAccountId === account.id;
+
+            return (
+              <div 
+                key={account.id}
+                className={cn(
+                  "p-4 rounded-2xl border flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all group",
+                  isActive 
+                    ? "bg-emerald-500/5 border-emerald-500/50 shadow-lg shadow-emerald-500/5" 
+                    : "bg-zinc-950 border-zinc-800 hover:border-zinc-700"
+                )}
+              >
+                <div className="flex items-center gap-4 flex-1">
+                  <div className={cn(
+                    "w-10 h-10 rounded-xl flex items-center justify-center font-black text-xs shrink-0 transition-transform group-hover:scale-105",
+                    isActive ? "bg-emerald-500 text-black shadow-lg shadow-emerald-500/20" : "bg-zinc-900 text-zinc-500"
+                  )}>
+                    {account.name.charAt(0).toUpperCase()}
                   </div>
-                )}
-                {accounts.length > 1 && (
-                  <button 
-                    onClick={() => onDeleteAccount(account.id)}
-                    className="p-2 bg-zinc-900 border border-zinc-800 text-zinc-500 hover:text-rose-400 rounded-xl opacity-0 group-hover:opacity-100 transition-all"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                )}
+                  
+                  <div className="flex-1 min-w-0">
+                    {isEditing ? (
+                      <div className="flex items-center gap-2 max-w-sm">
+                        <input
+                          type="text"
+                          value={editNameValue}
+                          onChange={(e) => setEditNameValue(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleSaveRename(account.id);
+                            if (e.key === 'Escape') setEditingAccountId(null);
+                          }}
+                          className="px-3 py-1.5 bg-zinc-900 border border-emerald-500/50 rounded-xl text-xs text-white focus:outline-none focus:ring-1 focus:ring-emerald-400 w-full"
+                          autoFocus
+                        />
+                        <button
+                          onClick={() => handleSaveRename(account.id)}
+                          className="p-1.5 bg-emerald-500 text-black rounded-lg hover:bg-emerald-400 transition-colors"
+                          title="Save Name"
+                        >
+                          <CheckCircle2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => setEditingAccountId(null)}
+                          className="p-1.5 bg-zinc-800 text-zinc-400 rounded-lg hover:text-white transition-colors"
+                          title="Cancel"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className={cn("text-xs font-bold truncate", isActive ? "text-white" : "text-zinc-300")}>
+                          {account.name}
+                        </p>
+                        <button 
+                          onClick={() => {
+                            setEditingAccountId(account.id);
+                            setEditNameValue(account.name);
+                          }}
+                          className="p-1 text-zinc-500 hover:text-emerald-400 transition-colors rounded"
+                          title="Rename account"
+                        >
+                          <Edit2 className="w-3 h-3" />
+                        </button>
+                        {isPinned && (
+                          <span className="px-2 py-0.5 bg-amber-500/10 border border-amber-500/30 text-amber-300 rounded-full text-[9px] font-bold uppercase tracking-wider flex items-center gap-1">
+                            <Star className="w-2.5 h-2.5 fill-amber-400 text-amber-400" />
+                            Default Locked
+                          </span>
+                        )}
+                        {isActive && (
+                          <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 rounded-full text-[9px] font-bold uppercase tracking-wider">
+                            Active
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    <p className="text-[10px] text-zinc-500 mt-0.5 truncate">
+                      {account.settings.profileName} • {account.settings.currency} • {account.trades.length} trades
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0 self-end md:self-auto">
+                  {!isPinned && (
+                    <button
+                      onClick={() => onSetDefaultAccount(account.id)}
+                      className="px-3 py-1.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-amber-500/40 text-amber-400 hover:text-amber-300 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5"
+                      title="Lock as permanent default startup account"
+                    >
+                      <Lock className="w-3 h-3" />
+                      Lock As Default
+                    </button>
+                  )}
+
+                  {!isActive ? (
+                    <button 
+                      onClick={() => onSwitchAccount(account.id)}
+                      className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-md hover:shadow-zinc-700/20 active:scale-95"
+                    >
+                      Switch
+                    </button>
+                  ) : (
+                    <div className="px-4 py-2 bg-emerald-500 text-black rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 shadow-lg shadow-emerald-500/20">
+                      <CheckCircle2 className="w-3 h-3" />
+                      In Use
+                    </div>
+                  )}
+
+                  {accounts.length > 1 && (
+                    <button 
+                      onClick={() => onDeleteAccount(account.id)}
+                      className="p-2 bg-zinc-900 border border-zinc-800 text-zinc-500 hover:text-rose-400 hover:border-rose-500/30 rounded-xl opacity-80 group-hover:opacity-100 transition-all"
+                      title="Delete account"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
           
           {accounts.length < 3 && (
             <button 
               onClick={onAddAccount}
-              className="w-full p-4 rounded-2xl border-2 border-dashed border-zinc-800 text-zinc-500 hover:border-zinc-700 hover:text-zinc-300 transition-all flex items-center justify-center gap-3 group"
+              className="w-full p-4 rounded-2xl border-2 border-dashed border-zinc-800 text-zinc-500 hover:border-emerald-500/40 hover:text-zinc-200 transition-all flex items-center justify-center gap-3 group bg-zinc-950/30 hover:bg-zinc-950"
             >
-              <div className="w-8 h-8 rounded-full bg-zinc-900 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <div className="w-8 h-8 rounded-full bg-zinc-900 flex items-center justify-center group-hover:scale-110 group-hover:bg-emerald-500 group-hover:text-black transition-all">
                 <Plus className="w-4 h-4" />
               </div>
               <span className="text-xs font-bold uppercase tracking-widest">Add Fresh Account</span>
@@ -8704,7 +8823,12 @@ export default function App() {
     },
     trades: []
   }]);
-  const [currentAccountId, setCurrentAccountId] = useState('default');
+  const [pinnedAccountId, setPinnedAccountId] = useState<string>(() => {
+    return localStorage.getItem('zync_pinned_account_id') || localStorage.getItem('zync_current_account_id') || 'default';
+  });
+  const [currentAccountId, setCurrentAccountId] = useState<string>(() => {
+    return localStorage.getItem('zync_pinned_account_id') || localStorage.getItem('zync_current_account_id') || 'default';
+  });
 
   const currentAccount = useMemo(() => 
     accounts.find(a => a.id === currentAccountId) || accounts[0],
@@ -8721,14 +8845,26 @@ export default function App() {
         const remoteAccounts = await dataService.getAccounts();
         if (remoteAccounts.length > 0) {
           setAccounts(remoteAccounts);
-          // Try to restore current account ID from local preferences or just use the first one
-          const lastAccountId = localStorage.getItem('zync_current_account_id');
-          const finalId = remoteAccounts.find(a => a.id === lastAccountId) ? lastAccountId! : remoteAccounts[0].id;
-          setCurrentAccountId(finalId);
           
-          const current = remoteAccounts.find(a => a.id === finalId) || remoteAccounts[0];
-          setSettings(current.settings);
-          setTrades(current.trades);
+          // Restore pinned/locked account by ID first, or by name preference
+          const savedPinnedId = localStorage.getItem('zync_pinned_account_id') || localStorage.getItem('zync_current_account_id');
+          const savedPinnedName = localStorage.getItem('zync_pinned_account_name');
+          
+          let targetAcc = remoteAccounts.find(a => a.id === savedPinnedId);
+          if (!targetAcc && savedPinnedName) {
+            targetAcc = remoteAccounts.find(a => a.name.toLowerCase() === savedPinnedName.toLowerCase());
+          }
+          const finalAcc = targetAcc || remoteAccounts[0];
+          const finalId = finalAcc.id;
+
+          setCurrentAccountId(finalId);
+          setPinnedAccountId(finalId);
+          localStorage.setItem('zync_current_account_id', finalId);
+          localStorage.setItem('zync_pinned_account_id', finalId);
+          localStorage.setItem('zync_pinned_account_name', finalAcc.name);
+          
+          setSettings(finalAcc.settings);
+          setTrades(finalAcc.trades);
         } else {
           // If no accounts exist in DB, create the default one
           const initialSettings: UserSettings = {
@@ -8746,6 +8882,10 @@ export default function App() {
           const newAcc = await dataService.createAccount('Primary Account', initialSettings);
           setAccounts([newAcc]);
           setCurrentAccountId(newAcc.id);
+          setPinnedAccountId(newAcc.id);
+          localStorage.setItem('zync_current_account_id', newAcc.id);
+          localStorage.setItem('zync_pinned_account_id', newAcc.id);
+          localStorage.setItem('zync_pinned_account_name', newAcc.name);
           setSettings(newAcc.settings);
           setTrades([]);
         }
@@ -8768,6 +8908,19 @@ export default function App() {
       await supabase.auth.signOut();
     } catch (err) {
       console.error('Error signing out:', err);
+    }
+    // Retain current and pinned account in localStorage so logout never resets account
+    try {
+      const updatedAccounts = accounts.map(a => a.id === currentAccountId ? { ...a, settings, trades } : a);
+      localStorage.setItem('zync_accounts', JSON.stringify(updatedAccounts));
+      localStorage.setItem('zync_current_account_id', currentAccountId);
+      localStorage.setItem('zync_pinned_account_id', pinnedAccountId || currentAccountId);
+      const curr = accounts.find(a => a.id === currentAccountId);
+      if (curr) {
+        localStorage.setItem('zync_pinned_account_name', curr.name);
+      }
+    } catch (err) {
+      console.warn('Failed to persist accounts on logout:', err);
     }
     setUser(null);
   };
@@ -8826,6 +8979,10 @@ export default function App() {
         const newAcc = await dataService.createAccount(`Account ${accounts.length + 1}`, newSettings);
         setAccounts([...accounts, newAcc]);
         setCurrentAccountId(newAcc.id);
+        setPinnedAccountId(newAcc.id);
+        localStorage.setItem('zync_current_account_id', newAcc.id);
+        localStorage.setItem('zync_pinned_account_id', newAcc.id);
+        localStorage.setItem('zync_pinned_account_name', newAcc.name);
       } catch (err) {
         console.error('Failed to create account in Supabase:', err);
       }
@@ -8839,6 +8996,10 @@ export default function App() {
       };
       setAccounts([...accounts, newAccount]);
       setCurrentAccountId(newId);
+      setPinnedAccountId(newId);
+      localStorage.setItem('zync_current_account_id', newId);
+      localStorage.setItem('zync_pinned_account_id', newId);
+      localStorage.setItem('zync_pinned_account_name', newAccount.name);
     }
   };
 
@@ -8846,7 +9007,42 @@ export default function App() {
     // Save current before switching (local state is fast)
     setAccounts(prev => prev.map(a => a.id === currentAccountId ? { ...a, settings, trades } : a));
     setCurrentAccountId(id);
+    setPinnedAccountId(id);
     localStorage.setItem('zync_current_account_id', id);
+    localStorage.setItem('zync_pinned_account_id', id);
+    const acc = accounts.find(a => a.id === id);
+    if (acc) {
+      localStorage.setItem('zync_pinned_account_name', acc.name);
+    }
+  };
+
+  const handleSetDefaultAccount = (id: string) => {
+    setPinnedAccountId(id);
+    setCurrentAccountId(id);
+    localStorage.setItem('zync_pinned_account_id', id);
+    localStorage.setItem('zync_current_account_id', id);
+    const acc = accounts.find(a => a.id === id);
+    if (acc) {
+      localStorage.setItem('zync_pinned_account_name', acc.name);
+    }
+  };
+
+  const handleRenameAccount = async (id: string, newName: string) => {
+    const trimmed = newName.trim();
+    if (!trimmed) return;
+    
+    setAccounts(prev => prev.map(a => a.id === id ? { ...a, name: trimmed } : a));
+    if (currentAccountId === id || pinnedAccountId === id) {
+      localStorage.setItem('zync_pinned_account_name', trimmed);
+    }
+    
+    if (user) {
+      try {
+        await dataService.updateAccount(id, { name: trimmed });
+      } catch (err) {
+        console.error('Failed to update account name in Supabase:', err);
+      }
+    }
   };
 
   const handleDeleteAccount = async (id: string) => {
@@ -8863,9 +9059,13 @@ export default function App() {
     
     const filtered = accounts.filter(a => a.id !== id);
     setAccounts(filtered);
-    if (currentAccountId === id) {
-      setCurrentAccountId(filtered[0].id);
-      localStorage.setItem('zync_current_account_id', filtered[0].id);
+    if (currentAccountId === id || pinnedAccountId === id) {
+      const nextId = filtered[0].id;
+      setCurrentAccountId(nextId);
+      setPinnedAccountId(nextId);
+      localStorage.setItem('zync_current_account_id', nextId);
+      localStorage.setItem('zync_pinned_account_id', nextId);
+      localStorage.setItem('zync_pinned_account_name', filtered[0].name);
     }
   };
 
@@ -8874,16 +9074,23 @@ export default function App() {
     if (user) return; // Skip if Supabase is being used
 
     const savedAccounts = localStorage.getItem('zync_accounts');
-    const savedCurrentAccountId = localStorage.getItem('zync_current_account_id');
+    const savedPinnedId = localStorage.getItem('zync_pinned_account_id') || localStorage.getItem('zync_current_account_id');
+    const savedPinnedName = localStorage.getItem('zync_pinned_account_name');
     
     if (savedAccounts) {
       const parsedAccounts = JSON.parse(savedAccounts);
       setAccounts(parsedAccounts);
-      if (savedCurrentAccountId && parsedAccounts.find((a: Account) => a.id === savedCurrentAccountId)) {
-        setCurrentAccountId(savedCurrentAccountId);
-        const current = parsedAccounts.find((a: Account) => a.id === savedCurrentAccountId);
-        setSettings(current.settings);
-        setTrades(current.trades);
+      
+      let matched = parsedAccounts.find((a: Account) => a.id === savedPinnedId);
+      if (!matched && savedPinnedName) {
+        matched = parsedAccounts.find((a: Account) => a.name.toLowerCase() === savedPinnedName.toLowerCase());
+      }
+      const chosen = matched || parsedAccounts[0];
+      if (chosen) {
+        setCurrentAccountId(chosen.id);
+        setPinnedAccountId(chosen.id);
+        setSettings(chosen.settings);
+        setTrades(chosen.trades);
       }
     } else {
       // Compatibility for older saves or fresh start
@@ -8936,18 +9143,28 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Remove LocalStorage auto-save if user is logged in
+  // LocalStorage auto-save for accounts and persistent locked account tracking
   useEffect(() => {
-    if (user) return; // Use Supabase
-
     try {
-      const updatedAccounts = accounts.map(a => a.id === currentAccountId ? { ...a, settings, trades } : a);
-      localStorage.setItem('zync_accounts', JSON.stringify(updatedAccounts));
-      localStorage.setItem('zync_current_account_id', currentAccountId);
+      if (currentAccountId) {
+        localStorage.setItem('zync_current_account_id', currentAccountId);
+        if (!localStorage.getItem('zync_pinned_account_id')) {
+          localStorage.setItem('zync_pinned_account_id', currentAccountId);
+        }
+      }
+      const activeAccountObj = accounts.find(a => a.id === currentAccountId);
+      if (activeAccountObj) {
+        localStorage.setItem('zync_pinned_account_name', activeAccountObj.name);
+      }
+
+      if (!user) {
+        const updatedAccounts = accounts.map(a => a.id === currentAccountId ? { ...a, settings, trades } : a);
+        localStorage.setItem('zync_accounts', JSON.stringify(updatedAccounts));
+      }
     } catch (error) {
       console.warn('Failed to save to localStorage:', error);
     }
-  }, [trades, settings, currentAccountId, accounts, user]);
+  }, [trades, settings, currentAccountId, accounts, user, pinnedAccountId]);
 
   const sortedTrades = useMemo(() => {
     return [...trades].sort((a, b) => new Date(b.entryDate).getTime() - new Date(a.entryDate).getTime());
@@ -9336,8 +9553,11 @@ export default function App() {
                     onUpdateSettings={handleUpdateSettings}
                     accounts={accounts}
                     currentAccountId={currentAccountId}
+                    pinnedAccountId={pinnedAccountId}
                     onAddAccount={handleAddAccount}
                     onSwitchAccount={handleSwitchAccount}
+                    onSetDefaultAccount={handleSetDefaultAccount}
+                    onRenameAccount={handleRenameAccount}
                     onDeleteAccount={handleDeleteAccount}
                     user={user}
                     onAuthComplete={handleAuthComplete}
