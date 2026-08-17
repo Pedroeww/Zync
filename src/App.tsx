@@ -547,20 +547,23 @@ const NewsImpactDot = ({ impact }: { impact: NewsImpact }) => {
   return <div className={cn("w-2 h-2 rounded-full", colors[impact])} title={`${impact} folder news`} />;
 };
 
-const HeroSection = ({ name, stats, onTabChange, onExport, hasTrades, currency, hidePnL }: { 
+const HeroSection = ({ name, stats, onTabChange, onExport, hasTrades, currency, hidePnL, startingBalance = 10000 }: { 
   name: string, 
   stats: DashboardStats, 
   onTabChange: (tab: string) => void,
   onExport: () => void,
   hasTrades: boolean,
   currency: string,
-  hidePnL: boolean
+  hidePnL: boolean,
+  startingBalance?: number
 }) => {
   const displayValue = (val: number, showSign: boolean = false) => {
     if (hidePnL) return '***';
     const sign = showSign && val > 0 ? '+' : '';
     return sign + formatCurrency(val, currency);
   };
+  
+  const totalAccountPct = (startingBalance && startingBalance > 0) ? (stats.totalPnL / startingBalance) * 100 : 0;
   
   return (
   <div className="relative overflow-hidden bg-zinc-900 border border-zinc-800 rounded-3xl p-8 mb-8">
@@ -575,8 +578,18 @@ const HeroSection = ({ name, stats, onTabChange, onExport, hasTrades, currency, 
             Welcome back, <span className="bg-gradient-to-r from-emerald-400 to-indigo-400 bg-clip-text text-transparent px-1">{name}</span>
           </h1>
           <p className="text-zinc-500 max-w-lg leading-relaxed text-sm">
-            Your equity is currently at <span className="text-zinc-200 font-semibold">{displayValue(stats.totalPnL)}</span> this month. 
-            Maintain your discipline and follow your rules.
+            Your equity is currently at <span className="text-zinc-200 font-semibold">{displayValue(stats.totalPnL)}</span>
+            {!hidePnL && (
+              <span className={cn(
+                "ml-2 text-xs font-mono font-bold px-2 py-0.5 rounded-lg border inline-block",
+                stats.totalPnL >= 0 
+                  ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" 
+                  : "bg-rose-500/10 text-rose-400 border-rose-500/20"
+              )}>
+                {totalAccountPct >= 0 ? '+' : ''}{totalAccountPct.toFixed(2)}% of account
+              </span>
+            )}{" "}
+            this month. Maintain your discipline and follow your rules.
           </p>
         </div>
         
@@ -1270,6 +1283,7 @@ const Dashboard = ({ stats, trades, onTabChange, profileName, currency, hidePnL,
   }, [trades, startingBalance]);
 
   const totalBalance = startingBalance + stats.totalPnL;
+  const totalAccountPct = (startingBalance && startingBalance > 0) ? (stats.totalPnL / startingBalance) * 100 : 0;
 
   return (
     <div className="space-y-8">
@@ -1282,6 +1296,7 @@ const Dashboard = ({ stats, trades, onTabChange, profileName, currency, hidePnL,
             hasTrades={trades.length > 0}
             currency={currency}
             hidePnL={hidePnL}
+            startingBalance={startingBalance}
           />
         </ScrollAnimatedSection>
         
@@ -1301,7 +1316,8 @@ const Dashboard = ({ stats, trades, onTabChange, profileName, currency, hidePnL,
             label="Total P&L" 
             value={displayValue(stats.totalPnL)} 
             type={stats.totalPnL >= 0 ? 'profit' : 'loss'}
-            trend={{ val: "12.4%", positive: stats.totalPnL >= 0 }}
+            subValue={`${totalAccountPct >= 0 ? '+' : ''}${totalAccountPct.toFixed(2)}% of account`}
+            trend={{ val: `${Math.abs(totalAccountPct).toFixed(2)}%`, positive: stats.totalPnL >= 0 }}
           />
           <StatsCard 
             label="Win Rate" 
@@ -1370,6 +1386,7 @@ const Dashboard = ({ stats, trades, onTabChange, profileName, currency, hidePnL,
                   <Tooltip 
                     contentStyle={{ backgroundColor: '#09090b', border: '1px solid #27272a', borderRadius: '12px' }}
                     itemStyle={{ color: '#10b981', fontSize: '12px' }}
+                    formatter={(value: any) => [typeof value === 'number' ? `${displayValue(value)} (${startingBalance > 0 ? ((value / startingBalance) * 100).toFixed(2) + '%' : '0%'})` : value, "P&L"]}
                   />
                   <Bar dataKey="pnl" fill="#10b981" radius={[4, 4, 0, 0]} />
                 </BarChart>
@@ -1381,6 +1398,7 @@ const Dashboard = ({ stats, trades, onTabChange, profileName, currency, hidePnL,
                   <Tooltip 
                     cursor={{ strokeDasharray: '3 3' }}
                     contentStyle={{ backgroundColor: '#09090b', border: '1px solid #27272a', borderRadius: '12px' }}
+                    formatter={(value: any) => [typeof value === 'number' ? `${displayValue(value)} (${startingBalance > 0 ? ((value / startingBalance) * 100).toFixed(2) + '%' : '0%'})` : value, "PnL"]}
                   />
                   <Scatter name="PnL Progression" data={equityData} fill="#10b981" />
                 </ScatterChart>
@@ -1398,6 +1416,7 @@ const Dashboard = ({ stats, trades, onTabChange, profileName, currency, hidePnL,
                   <Tooltip 
                     contentStyle={{ backgroundColor: '#09090b', border: '1px solid #27272a', borderRadius: '12px' }}
                     itemStyle={{ color: '#10b981', fontSize: '12px' }}
+                    formatter={(value: any, name: any) => [typeof value === 'number' ? `${displayValue(value)}` : value, name === 'cumulativePnL' ? 'Cumulative P&L' : 'Balance']}
                   />
                   <Area 
                     type={chartType === 'cubic' ? "monotone" : "linear"} 
@@ -1439,29 +1458,39 @@ const Dashboard = ({ stats, trades, onTabChange, profileName, currency, hidePnL,
           </div>
           <div className="divide-y divide-zinc-800 flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent">
             {recentActivityTrades.length > 0 ? (
-              recentActivityTrades.map(trade => (
-                <div 
-                  key={trade.id} 
-                  onClick={() => onSelectExecution(trade.id)}
-                  className="p-4 hover:bg-zinc-800/50 transition-colors cursor-pointer group"
-                >
-                  <div className="flex justify-between items-start mb-1">
-                    <p className="font-semibold text-white text-xs">{trade.asset} <span className="text-[10px] text-zinc-600 ml-1">{trade.side}</span></p>
-                    <p className={cn("font-bold text-xs", trade.pnl >= 0 ? "text-emerald-400" : "text-rose-400")}>
-                      {trade.pnl >= 0 ? '+' : ''}{formatCurrency(trade.pnl, currency)}
-                    </p>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <p className="text-[10px] text-zinc-500">{trade.strategy}</p>
-                    <div className={cn(
-                      "px-1.5 py-0.5 rounded-full text-[8px] font-bold border",
-                      trade.pnl >= 0 ? "bg-emerald-900/30 text-emerald-400 border-emerald-900/50" : "bg-rose-900/30 text-rose-400 border-rose-900/50"
-                    )}>
-                      {trade.pnl >= 0 ? 'WIN' : 'LOSS'}
+              recentActivityTrades.map(trade => {
+                const tradeAccountPct = (startingBalance && startingBalance > 0) ? (trade.pnl / startingBalance) * 100 : 0;
+                return (
+                  <div 
+                    key={trade.id} 
+                    onClick={() => onSelectExecution(trade.id)}
+                    className="p-4 hover:bg-zinc-800/50 transition-colors cursor-pointer group"
+                  >
+                    <div className="flex justify-between items-start mb-1">
+                      <p className="font-semibold text-white text-xs">{trade.asset} <span className="text-[10px] text-zinc-600 ml-1">{trade.side}</span></p>
+                      <div className="text-right">
+                        <p className={cn("font-bold text-xs tabular-nums leading-none", trade.pnl >= 0 ? "text-emerald-400" : "text-rose-400")}>
+                          {trade.pnl >= 0 ? '+' : ''}{formatCurrency(trade.pnl, currency)}
+                        </p>
+                        {!hidePnL && (
+                          <p className={cn("text-[10px] font-mono font-bold mt-0.5", trade.pnl >= 0 ? "text-emerald-400/90" : "text-rose-400/90")}>
+                            {tradeAccountPct >= 0 ? '+' : ''}{tradeAccountPct.toFixed(2)}%
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <p className="text-[10px] text-zinc-500">{trade.strategy}</p>
+                      <div className={cn(
+                        "px-1.5 py-0.5 rounded-full text-[8px] font-bold border",
+                        trade.pnl >= 0 ? "bg-emerald-900/30 text-emerald-400 border-emerald-900/50" : "bg-rose-900/30 text-rose-400 border-rose-900/50"
+                      )}>
+                        {trade.pnl >= 0 ? 'WIN' : 'LOSS'}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))
+                );
+              })
             ) : (
               <div className="flex flex-col items-center justify-center h-full p-8 text-center bg-zinc-950/20">
                  <div className="w-12 h-12 rounded-full bg-zinc-900 flex items-center justify-center mb-4 border border-zinc-800">
@@ -1489,13 +1518,15 @@ const Dashboard = ({ stats, trades, onTabChange, profileName, currency, hidePnL,
       
       <JournalSlideshow 
         trades={trades} 
-        onSelectTrade={onSelectExecution} 
+        onSelectTrade={onSelectExecution}
+        currency={currency}
+        startingBalance={startingBalance}
       />
     </div>
   );
 };
 
-const JournalSlideshow = ({ trades, onSelectTrade }: { trades: Trade[], onSelectTrade: (id: string) => void }) => {
+const JournalSlideshow = ({ trades, onSelectTrade, currency = 'USD', startingBalance = 10000 }: { trades: Trade[], onSelectTrade: (id: string) => void, currency?: string, startingBalance?: number }) => {
   const images = useMemo(() => {
     const collected: { src: string, date: string, pnl: number, asset: string, id: string }[] = [];
     trades.forEach(t => {
@@ -1565,8 +1596,9 @@ const JournalSlideshow = ({ trades, onSelectTrade }: { trades: Trade[], onSelect
                <div className="absolute bottom-6 left-6 z-20 opacity-0 group-hover:opacity-100 translate-y-4 group-hover:translate-y-0 transition-all duration-500">
                   <div className="px-6 py-4 bg-black/80 backdrop-blur-xl rounded-[2rem] border border-white/10 space-y-1 shadow-2xl">
                      <p className="text-[18px] font-black text-white uppercase tracking-tighter">{img.asset} • {format(new Date(img.date), 'MMM dd, yyyy')}</p>
-                     <p className={cn("text-[16px] font-black uppercase tracking-widest", img.pnl >= 0 ? "text-emerald-400" : "text-rose-400")}>
-                        {img.pnl >= 0 ? '+' : ''}{img.pnl.toFixed(2)}
+                     <p className={cn("text-[16px] font-black uppercase tracking-widest flex items-center gap-2", img.pnl >= 0 ? "text-emerald-400" : "text-rose-400")}>
+                        <span>{img.pnl >= 0 ? '+' : ''}{formatCurrency(img.pnl, currency)}</span>
+                        <span className="text-xs font-mono font-bold opacity-90">({img.pnl >= 0 ? '+' : ''}{((img.pnl / (startingBalance || 10000)) * 100).toFixed(2)}%)</span>
                      </p>
                   </div>
                </div>
@@ -1578,7 +1610,7 @@ const JournalSlideshow = ({ trades, onSelectTrade }: { trades: Trade[], onSelect
   );
 };
 
-const PnLCalendar = ({ trades, setSelectedTrade, currency, hidePnL, profileName }: { trades: Trade[], setSelectedTrade: (t: Trade) => void, currency: string, hidePnL: boolean, profileName: string }) => {
+const PnLCalendar = ({ trades, setSelectedTrade, currency, hidePnL, profileName, startingBalance = 10000 }: { trades: Trade[], setSelectedTrade: (t: Trade) => void, currency: string, hidePnL: boolean, profileName: string, startingBalance?: number }) => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const calendarRef = useRef<HTMLDivElement>(null);
   const posterRef = useRef<HTMLDivElement>(null);
@@ -1614,6 +1646,8 @@ const PnLCalendar = ({ trades, setSelectedTrade, currency, hidePnL, profileName 
     }
   };
 
+  const accountStartingBalance = startingBalance > 0 ? startingBalance : 10000;
+
   const displayValue = (val: number, showSign: boolean = false) => {
     if (hidePnL) return '***';
     const sign = showSign && val > 0 ? '+' : '';
@@ -1635,6 +1669,7 @@ const PnLCalendar = ({ trades, setSelectedTrade, currency, hidePnL, profileName 
   const monthPnL = monthTrades.reduce((acc, t) => acc + t.pnl, 0);
   const monthWins = monthTrades.filter(t => t.pnl > 0).length;
   const monthWinRate = monthTrades.length > 0 ? (monthWins / monthTrades.length) * 100 : 0;
+  const monthAccountPct = (monthPnL / accountStartingBalance) * 100;
 
   // Weekly P&L grouping
   const weeks = [];
@@ -1666,9 +1701,21 @@ const PnLCalendar = ({ trades, setSelectedTrade, currency, hidePnL, profileName 
         <div className="flex items-center gap-8">
           <div className="text-right">
              <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest leading-none mb-1">Month Performance</p>
-             <p className={cn("text-xl font-black tabular-nums leading-none", monthPnL >= 0 ? "text-emerald-400" : "text-rose-400")}>
-                {monthPnL >= 0 ? '+' : ''}{displayValue(monthPnL)}
-             </p>
+             <div className="flex items-center justify-end gap-2">
+               <p className={cn("text-xl font-black tabular-nums leading-none", monthPnL >= 0 ? "text-emerald-400" : "text-rose-400")}>
+                  {monthPnL >= 0 ? '+' : ''}{displayValue(monthPnL)}
+               </p>
+               {!hidePnL && (
+                 <span className={cn(
+                   "text-xs font-black font-mono px-2 py-0.5 rounded-lg border",
+                   monthPnL >= 0 
+                     ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" 
+                     : "bg-rose-500/10 text-rose-400 border-rose-500/20"
+                 )}>
+                   {monthPnL >= 0 ? '+' : ''}{monthAccountPct.toFixed(2)}%
+                 </span>
+               )}
+             </div>
           </div>
           
           <div className="h-10 w-px bg-zinc-800 hidden md:block" />
@@ -1721,6 +1768,7 @@ const PnLCalendar = ({ trades, setSelectedTrade, currency, hidePnL, profileName 
             {calendarDays.map((day, idx) => {
               const dayTrades = (trades || []).filter(t => isSameDay(parseISO(t.exitDate), day));
               const dayPnL = dayTrades.reduce((acc, t) => acc + t.pnl, 0);
+              const dayAccountPct = (dayPnL / accountStartingBalance) * 100;
               const isCurrentMonth = isSameDay(startOfMonth(day), startOfMonth(currentMonth));
               const isToday = isSameDay(day, new Date());
 
@@ -1733,41 +1781,66 @@ const PnLCalendar = ({ trades, setSelectedTrade, currency, hidePnL, profileName 
                     isToday && "bg-emerald-500/5 ring-1 ring-inset ring-emerald-500/20"
                   )}
                 >
-                  <div className="flex justify-between items-start mb-2">
+                  <div className="flex justify-between items-start mb-2 gap-1">
                     <span className={cn(
-                      "text-xs font-black px-1.5 py-0.5 rounded-md",
+                      "text-xs font-black px-1.5 py-0.5 rounded-md shrink-0",
                       isToday ? "bg-emerald-500 text-black" : (!isCurrentMonth ? "text-zinc-700" : "text-zinc-600")
                     )}>
                       {format(day, 'd')}
                     </span>
                     {dayPnL !== 0 && (
-                      <span className={cn(
-                        "text-xs font-bold tabular-nums",
-                        dayPnL > 0 ? "text-emerald-400" : "text-rose-400"
-                      )}>
-                        {dayPnL > 0 ? '+' : ''}{displayValue(dayPnL)}
-                      </span>
+                      <div className="text-right flex flex-col items-end leading-none gap-0.5">
+                        <span className={cn(
+                          "text-xs font-bold tabular-nums",
+                          dayPnL > 0 ? "text-emerald-400" : "text-rose-400"
+                        )}>
+                          {dayPnL > 0 ? '+' : ''}{displayValue(dayPnL)}
+                        </span>
+                        {!hidePnL && (
+                          <span className={cn(
+                            "text-[10px] font-black tabular-nums font-mono px-1 py-0.5 rounded border",
+                            dayAccountPct > 0 
+                              ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/20" 
+                              : "bg-rose-500/15 text-rose-300 border-rose-500/20"
+                          )}>
+                            {dayAccountPct > 0 ? '+' : ''}{dayAccountPct.toFixed(2)}%
+                          </span>
+                        )}
+                      </div>
                     )}
                   </div>
                   
                   <div className="space-y-1 flex-1 overflow-y-auto custom-scrollbar pr-1">
-                    {dayTrades.map(trade => (
-                      <button
-                        key={trade.id}
-                        onClick={() => setSelectedTrade(trade)}
-                        className={cn(
-                          "w-full text-left p-2 rounded-lg text-[9px] font-bold border transition-all hover:scale-[1.05] active:scale-[0.98] shadow-sm",
-                          trade.pnl >= 0 
-                            ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20" 
-                            : "bg-rose-500/10 border-rose-500/20 text-rose-400 hover:bg-rose-500/20"
-                        )}
-                      >
-                        <div className="flex justify-between items-center">
-                          <span className="truncate max-w-[50px]">{trade.asset}</span>
-                          <span className="tabular-nums">{displayValue(trade.pnl, true)}</span>
-                        </div>
-                      </button>
-                    ))}
+                    {dayTrades.map(trade => {
+                      const tradeAccountPct = (trade.pnl / accountStartingBalance) * 100;
+                      return (
+                        <button
+                          key={trade.id}
+                          onClick={() => setSelectedTrade(trade)}
+                          className={cn(
+                            "w-full text-left p-1.5 rounded-lg text-[9px] font-bold border transition-all hover:scale-[1.03] active:scale-[0.98] shadow-sm",
+                            trade.pnl >= 0 
+                              ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20" 
+                              : "bg-rose-500/10 border-rose-500/20 text-rose-400 hover:bg-rose-500/20"
+                          )}
+                        >
+                          <div className="flex justify-between items-center gap-1">
+                            <span className="truncate max-w-[48px] font-mono">{trade.asset}</span>
+                            <div className="flex items-center gap-1 shrink-0 tabular-nums">
+                              <span>{displayValue(trade.pnl, true)}</span>
+                              {!hidePnL && (
+                                <span className={cn(
+                                  "text-[8px] font-mono font-black px-1 py-0.2 rounded",
+                                  trade.pnl >= 0 ? "bg-emerald-500/20 text-emerald-300" : "bg-rose-500/20 text-rose-300"
+                                )}>
+                                  {tradeAccountPct >= 0 ? '+' : ''}{tradeAccountPct.toFixed(2)}%
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               );
@@ -1781,17 +1854,30 @@ const PnLCalendar = ({ trades, setSelectedTrade, currency, hidePnL, profileName 
             Weekly
           </div>
           <div className="flex-1 flex flex-col justify-around">
-            {weeklyPnL.map((pnl, idx) => (
-              <div key={idx} className="flex-1 flex flex-col items-center justify-center border-b border-zinc-800 p-2 text-center group/week hover:bg-zinc-800/20 transition-colors">
-                <span className="text-[8px] font-black text-zinc-700 uppercase tracking-widest mb-1 group-hover/week:text-zinc-500 transition-colors">Week {idx + 1}</span>
-                <span className={cn(
-                  "text-xs font-black tabular-nums",
-                  pnl > 0 ? "text-emerald-400" : (pnl < 0 ? "text-rose-400" : "text-zinc-600")
-                )}>
-                  {pnl !== 0 ? (pnl > 0 ? '+' : '') + displayValue(pnl) : '—'}
-                </span>
-              </div>
-            ))}
+            {weeklyPnL.map((pnl, idx) => {
+              const weekAccountPct = (pnl / accountStartingBalance) * 100;
+              return (
+                <div key={idx} className="flex-1 flex flex-col items-center justify-center border-b border-zinc-800 p-2 text-center group/week hover:bg-zinc-800/20 transition-colors">
+                  <span className="text-[8px] font-black text-zinc-700 uppercase tracking-widest mb-1 group-hover/week:text-zinc-500 transition-colors">Week {idx + 1}</span>
+                  <span className={cn(
+                    "text-xs font-black tabular-nums leading-tight",
+                    pnl > 0 ? "text-emerald-400" : (pnl < 0 ? "text-rose-400" : "text-zinc-600")
+                  )}>
+                    {pnl !== 0 ? (pnl > 0 ? '+' : '') + displayValue(pnl) : '—'}
+                  </span>
+                  {pnl !== 0 && !hidePnL && (
+                    <span className={cn(
+                      "text-[9px] font-mono font-black mt-1 px-1 py-0.5 rounded border",
+                      weekAccountPct > 0 
+                        ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/20" 
+                        : "bg-rose-500/15 text-rose-300 border-rose-500/20"
+                    )}>
+                      {weekAccountPct > 0 ? '+' : ''}{weekAccountPct.toFixed(2)}%
+                    </span>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -1876,9 +1962,12 @@ const PnLCalendar = ({ trades, setSelectedTrade, currency, hidePnL, profileName 
               captureOrientation === 'portrait' ? "grid-cols-2" : "grid-cols-2 w-1/3"
             )}>
               <div className="p-8 bg-zinc-900 border border-zinc-800 rounded-[2rem]">
-                <p className="text-zinc-600 font-black uppercase tracking-[0.3em] text-[10px] mb-3">Net Profit</p>
+                <p className="text-zinc-600 font-black uppercase tracking-[0.3em] text-[10px] mb-3">Net Profit & Account Gain</p>
                 <p className={cn("text-4xl font-black tabular-nums tracking-tighter", monthPnL >= 0 ? "text-emerald-400" : "text-rose-400")}>
                   {monthPnL >= 0 ? '+' : ''}{displayValue(monthPnL)}
+                </p>
+                <p className={cn("text-base font-mono font-black mt-1", monthPnL >= 0 ? "text-emerald-400" : "text-rose-400")}>
+                  {monthPnL >= 0 ? '+' : ''}{monthAccountPct.toFixed(2)}% of account
                 </p>
               </div>
               <div className="p-8 bg-zinc-900 border border-zinc-800 rounded-[2rem]">
@@ -1904,6 +1993,7 @@ const PnLCalendar = ({ trades, setSelectedTrade, currency, hidePnL, profileName 
                 {calendarDays.map((day, idx) => {
                   const dayTrades = (trades || []).filter(t => isSameDay(parseISO(t.exitDate), day));
                   const dayPnL = dayTrades.reduce((acc, t) => acc + t.pnl, 0);
+                  const dayAccountPct = (dayPnL / accountStartingBalance) * 100;
                   const isCurMonth = isSameMonth(day, currentMonth);
                   
                   return (
@@ -1913,11 +2003,19 @@ const PnLCalendar = ({ trades, setSelectedTrade, currency, hidePnL, profileName 
                     )}>
                       <span className="text-xs font-black text-zinc-700 mb-1">{format(day, 'd')}</span>
                       {dayPnL !== 0 && (
-                        <div className={cn(
-                          "mt-auto text-[14.5px] font-black tabular-nums",
-                          dayPnL > 0 ? "text-emerald-400" : "text-rose-400"
-                        )}>
-                          {dayPnL > 0 ? '+' : ''}{displayValue(dayPnL)}
+                        <div className="mt-auto flex flex-col items-end leading-tight">
+                          <div className={cn(
+                            "text-[14.5px] font-black tabular-nums",
+                            dayPnL > 0 ? "text-emerald-400" : "text-rose-400"
+                          )}>
+                            {dayPnL > 0 ? '+' : ''}{displayValue(dayPnL)}
+                          </div>
+                          <div className={cn(
+                            "text-[11px] font-mono font-black",
+                            dayAccountPct > 0 ? "text-emerald-400" : "text-rose-400"
+                          )}>
+                            {dayAccountPct > 0 ? '+' : ''}{dayAccountPct.toFixed(2)}%
+                          </div>
                         </div>
                       )}
                     </div>
@@ -1931,14 +2029,22 @@ const PnLCalendar = ({ trades, setSelectedTrade, currency, hidePnL, profileName 
               <div className="p-6 bg-zinc-900 border border-zinc-800 rounded-[2rem] flex-1 flex flex-col shadow-xl">
                  <p className="text-zinc-600 font-black uppercase tracking-[0.3em] text-[10px] mb-6 text-center border-b border-zinc-800 pb-4">Weekly Net</p>
                  <div className="flex-1 flex flex-col justify-around">
-                    {weeklyPnL.map((pnl, idx) => (
-                      <div key={idx} className="text-center py-2">
-                        <p className="text-[8px] font-black text-zinc-700 uppercase tracking-widest mb-1">Week {idx + 1}</p>
-                        <p className={cn("text-[17px] font-black tabular-nums", pnl > 0 ? "text-emerald-400" : (pnl < 0 ? "text-rose-400" : "text-zinc-800"))}>
-                          {pnl !== 0 ? (pnl > 0 ? '+' : '') + displayValue(pnl) : '—'}
-                        </p>
-                      </div>
-                    ))}
+                    {weeklyPnL.map((pnl, idx) => {
+                      const weekAccountPct = (pnl / accountStartingBalance) * 100;
+                      return (
+                        <div key={idx} className="text-center py-2">
+                          <p className="text-[8px] font-black text-zinc-700 uppercase tracking-widest mb-1">Week {idx + 1}</p>
+                          <p className={cn("text-[17px] font-black tabular-nums", pnl > 0 ? "text-emerald-400" : (pnl < 0 ? "text-rose-400" : "text-zinc-800"))}>
+                            {pnl !== 0 ? (pnl > 0 ? '+' : '') + displayValue(pnl) : '—'}
+                          </p>
+                          {pnl !== 0 && (
+                            <p className={cn("text-[11px] font-mono font-bold mt-0.5", weekAccountPct > 0 ? "text-emerald-400" : "text-rose-400")}>
+                              {weekAccountPct > 0 ? '+' : ''}{weekAccountPct.toFixed(2)}%
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })}
                  </div>
               </div>
             </div>
@@ -2332,7 +2438,7 @@ const TradeJournal = ({ trades, onAddTrade, onUpdateTrade, onDeleteTrade, settin
               transition={{ duration: 0.2 }}
               className="overflow-x-auto custom-scrollbar"
             >
-              <PnLCalendar trades={filteredTrades} setSelectedTrade={setSelectedTrade} currency={currency} hidePnL={hidePnL} profileName={settings.profileName} />
+              <PnLCalendar trades={filteredTrades} setSelectedTrade={setSelectedTrade} currency={currency} hidePnL={hidePnL} profileName={settings.profileName} startingBalance={settings.startingBalance} />
             </motion.div>
           )}
         </AnimatePresence>
@@ -2644,9 +2750,8 @@ const TradeJournal = ({ trades, onAddTrade, onUpdateTrade, onDeleteTrade, settin
                     ? (exitPrice - entryPrice) * posSize 
                     : (entryPrice - exitPrice) * posSize);
 
-                const pnlPercentage = isManualPnl 
-                  ? (pnl / (settings.startingBalance || 10000)) * 100 
-                  : ((entryPrice * posSize) !== 0 ? (pnl / (entryPrice * posSize)) * 100 : 0);
+                const accountStartingBalance = (settings.startingBalance && settings.startingBalance > 0) ? settings.startingBalance : 10000;
+                const pnlPercentage = (pnl / accountStartingBalance) * 100;
 
                 const tradeData: Partial<Trade> = {
                   asset: (formData.get('asset') as string) || 'Unknown',
@@ -3042,7 +3147,7 @@ const TradeJournal = ({ trades, onAddTrade, onUpdateTrade, onDeleteTrade, settin
   );
 };
 
-const Analytics = ({ trades, currency, hidePnL, user, profileName, onUpdateTrade }: { trades: Trade[], currency: string, hidePnL: boolean, user: User | null, profileName: string, onUpdateTrade: (id: string, updates: Partial<Trade>) => void }) => {
+const Analytics = ({ trades, currency, hidePnL, user, profileName, onUpdateTrade, startingBalance = 10000 }: { trades: Trade[], currency: string, hidePnL: boolean, user: User | null, profileName: string, onUpdateTrade: (id: string, updates: Partial<Trade>) => void, startingBalance?: number }) => {
   const [selectedTrade, setSelectedTrade] = useState<Trade | null>(null);
   const [showExportModal, setShowExportModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -4609,7 +4714,7 @@ const Analytics = ({ trades, currency, hidePnL, user, profileName, onUpdateTrade
 
       {/* Analytics Footer with Quotes */}
       <ScrollAnimatedSection delay={0.2} className="bg-zinc-900 border border-zinc-800 rounded-3xl overflow-hidden mb-12">
-        <PnLCalendar trades={trades} setSelectedTrade={setSelectedTrade} currency={currency} hidePnL={hidePnL} profileName={profileName} />
+        <PnLCalendar trades={trades} setSelectedTrade={setSelectedTrade} currency={currency} hidePnL={hidePnL} profileName={profileName} startingBalance={startingBalance} />
       </ScrollAnimatedSection>
 
       <AnimatePresence>
@@ -9224,7 +9329,7 @@ export default function App() {
                     user={user}
                   />
                 )}
-                {activeTab === 'analytics' && <Analytics trades={sortedTrades} currency={settings.currency} hidePnL={settings.hidePnL} user={user} profileName={settings.profileName} onUpdateTrade={handleUpdateTrade} />}
+                {activeTab === 'analytics' && <Analytics trades={sortedTrades} currency={settings.currency} hidePnL={settings.hidePnL} user={user} profileName={settings.profileName} onUpdateTrade={handleUpdateTrade} startingBalance={settings.startingBalance} />}
                 {activeTab === 'settings' && (
                   <Settings 
                     settings={settings} 
