@@ -61,6 +61,9 @@ import {
   Brain,
   Tags,
   ShieldCheck,
+  ShieldAlert,
+  Sliders,
+  Gauge,
   Activity
 } from 'lucide-react';
 
@@ -1155,31 +1158,55 @@ const ExportModal = ({ trades, profileName, onClose, currency, hidePnL, initialT
     </div>
   );
 };
-const StatsCard = ({ label, value, subValue, trend, icon: Icon, type = 'normal' }: { 
+const StatsCard = ({ 
+  label, 
+  value, 
+  subValue, 
+  trend, 
+  icon: Icon, 
+  type = 'normal',
+  action,
+  progressBar
+}: { 
   label: string, 
   value: string, 
   subValue?: string,
   trend?: { val: string, positive: boolean },
   icon?: any,
-  type?: 'normal' | 'profit' | 'loss'
+  type?: 'normal' | 'profit' | 'loss',
+  action?: React.ReactNode,
+  progressBar?: { percent: number, color?: string }
 }) => (
-  <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-xl">
-    <p className="text-zinc-500 text-[10px] uppercase tracking-wider font-bold mb-1">{label}</p>
-    <h3 className={cn(
-      "text-xl font-bold",
-      type === 'profit' ? 'text-emerald-400' : 
-      type === 'loss' ? 'text-rose-400' : 'text-white'
-    )}>{value}</h3>
-    {subValue && <p className="text-[10px] text-zinc-600 mt-1">{subValue}</p>}
-    {trend && (
-      <p className={cn(
-        "text-[10px] mt-1 font-medium",
-        trend.positive ? "text-emerald-500" : "text-rose-500"
-      )}>
-        {trend.positive ? '+' : ''}{trend.val} vs last period
-      </p>
+  <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-xl relative group flex flex-col justify-between">
+    <div>
+      <div className="flex items-center justify-between mb-1 gap-1">
+        <p className="text-zinc-500 text-[10px] uppercase tracking-wider font-bold truncate">{label}</p>
+        {action}
+      </div>
+      <h3 className={cn(
+        "text-xl font-bold font-mono",
+        type === 'profit' ? 'text-emerald-400' : 
+        type === 'loss' ? 'text-rose-400' : 'text-white'
+      )}>{value}</h3>
+      {subValue && <p className="text-[10px] text-zinc-500 mt-1 truncate">{subValue}</p>}
+      {trend && (
+        <p className={cn(
+          "text-[10px] mt-1 font-medium",
+          trend.positive ? "text-emerald-500" : "text-rose-500"
+        )}>
+          {trend.positive ? '+' : ''}{trend.val} vs last period
+        </p>
+      )}
+    </div>
+    {progressBar && (
+      <div className="w-full h-1 bg-zinc-800 rounded-full mt-2 overflow-hidden">
+        <div 
+          className={cn("h-full rounded-full transition-all duration-500", progressBar.color || "bg-emerald-500")} 
+          style={{ width: `${Math.min(100, Math.max(0, progressBar.percent))}%` }} 
+        />
+      </div>
     )}
-    {label === "Win Rate" && (
+    {!progressBar && label === "Win Rate" && (
       <div className="w-full h-1 bg-zinc-800 rounded-full mt-2">
         <div className="bg-emerald-500 h-full rounded-full" style={{ width: value }} />
       </div>
@@ -1187,9 +1214,441 @@ const StatsCard = ({ label, value, subValue, trend, icon: Icon, type = 'normal' 
   </div>
 );
 
+const DDLModal = ({
+  startingBalance,
+  currentBalance,
+  currency,
+  settings,
+  onClose,
+  onSave,
+  hidePnL
+}: {
+  startingBalance: number;
+  currentBalance: number;
+  currency: string;
+  settings: UserSettings;
+  onClose: () => void;
+  onSave: (updates: { maxDrawdownLimit: number; drawdownFloor: number; drawdownInputMode: 'buffer' | 'floor' | 'percent' }) => void;
+  hidePnL: boolean;
+}) => {
+  const [inputMode, setInputMode] = useState<'buffer' | 'floor' | 'percent'>(settings.drawdownInputMode || 'buffer');
+  
+  const defaultBuffer = settings.maxDrawdownLimit ?? (startingBalance * 0.1);
+  const defaultFloor = settings.drawdownFloor ?? (startingBalance - defaultBuffer);
+  const defaultPercent = startingBalance > 0 ? (defaultBuffer / startingBalance) * 100 : 10;
+
+  const [bufferValue, setBufferValue] = useState<number>(defaultBuffer);
+  const [floorValue, setFloorValue] = useState<number>(defaultFloor);
+  const [percentValue, setPercentValue] = useState<number>(Number(defaultPercent.toFixed(1)));
+
+  const effectiveLimit = useMemo(() => {
+    if (inputMode === 'buffer') return Math.max(0, bufferValue);
+    if (inputMode === 'floor') return Math.max(0, startingBalance - floorValue);
+    if (inputMode === 'percent') return Math.max(0, startingBalance * (percentValue / 100));
+    return defaultBuffer;
+  }, [inputMode, bufferValue, floorValue, percentValue, startingBalance, defaultBuffer]);
+
+  const effectiveFloor = useMemo(() => {
+    if (inputMode === 'floor') return Math.max(0, floorValue);
+    return Math.max(0, startingBalance - effectiveLimit);
+  }, [inputMode, floorValue, startingBalance, effectiveLimit]);
+
+  const distanceToDDL = currentBalance - effectiveFloor;
+  const distancePct = startingBalance > 0 ? (distanceToDDL / startingBalance) * 100 : 0;
+  const bufferPercentLeft = effectiveLimit > 0 ? Math.max(0, Math.min(100, (distanceToDDL / effectiveLimit) * 100)) : 0;
+
+  const isBreached = distanceToDDL <= 0;
+  const isCritical = !isBreached && bufferPercentLeft < 30;
+  const isWarning = !isBreached && !isCritical && bufferPercentLeft < 65;
+
+  const handleApplyPreset = (pct: number) => {
+    setInputMode('percent');
+    setPercentValue(pct);
+    const buf = startingBalance * (pct / 100);
+    setBufferValue(buf);
+    setFloorValue(startingBalance - buf);
+  };
+
+  const handleConfirm = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSave({
+      maxDrawdownLimit: effectiveLimit,
+      drawdownFloor: effectiveFloor,
+      drawdownInputMode: inputMode
+    });
+    onClose();
+  };
+
+  const displayVal = (val: number, showSign: boolean = false) => {
+    if (hidePnL) return '***';
+    const sign = showSign && val > 0 ? '+' : '';
+    return sign + formatCurrency(val, currency);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      <motion.div 
+        initial={{ opacity: 0 }} 
+        animate={{ opacity: 1 }} 
+        exit={{ opacity: 0 }}
+        onClick={onClose}
+        className="absolute inset-0 bg-black/85 backdrop-blur-md"
+      />
+      <motion.div 
+        initial={{ scale: 0.95, opacity: 0, y: 20 }} 
+        animate={{ scale: 1, opacity: 1, y: 0 }} 
+        exit={{ scale: 0.95, opacity: 0, y: 20 }}
+        className="relative w-full max-w-lg bg-[#0e0e10] border border-zinc-800 rounded-3xl p-6 sm:p-8 shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto"
+      >
+        <div className="flex justify-between items-center mb-6">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+              <ShieldAlert className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-lg font-black text-white uppercase tracking-tight">Manual DDL Configuration</h3>
+              <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Distance to Drawdown Limit</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-2 text-zinc-500 hover:text-white hover:bg-zinc-800 rounded-xl transition-colors">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleConfirm} className="space-y-6">
+          {/* Mode Selector */}
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Input Method</label>
+            <div className="grid grid-cols-3 gap-2 bg-zinc-950 p-1.5 rounded-2xl border border-zinc-800">
+              {[
+                { id: 'buffer', label: 'Loss Buffer ($)' },
+                { id: 'floor', label: 'Floor Balance ($)' },
+                { id: 'percent', label: 'Percentage (%)' }
+              ].map(m => (
+                <button
+                  type="button"
+                  key={m.id}
+                  onClick={() => setInputMode(m.id as any)}
+                  className={cn(
+                    "py-2 px-2 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all",
+                    inputMode === m.id 
+                      ? "bg-zinc-800 text-white shadow-md border border-zinc-700" 
+                      : "text-zinc-500 hover:text-zinc-300"
+                  )}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Quick Presets */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Quick Prop & Risk Presets</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {[
+                { label: '4% Daily Stop', pct: 4 },
+                { label: '5% Trailing', pct: 5 },
+                { label: '8% Max Loss', pct: 8 },
+                { label: '10% Standard', pct: 10 },
+                { label: '12% Relaxed', pct: 12 },
+              ].map(p => (
+                <button
+                  type="button"
+                  key={p.pct}
+                  onClick={() => handleApplyPreset(p.pct)}
+                  className={cn(
+                    "px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider border transition-all",
+                    inputMode === 'percent' && percentValue === p.pct
+                      ? "bg-indigo-500/20 text-indigo-300 border-indigo-500/40"
+                      : "bg-zinc-950 text-zinc-400 border-zinc-800 hover:border-zinc-700 hover:text-zinc-200"
+                  )}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Main Input Field */}
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest flex items-center justify-between">
+              <span>
+                {inputMode === 'buffer' && 'Maximum Allowed Cash Loss (DDL Buffer)'}
+                {inputMode === 'floor' && 'Exact Drawdown Floor Balance'}
+                {inputMode === 'percent' && 'Maximum Percentage Drawdown Limit'}
+              </span>
+              <span className="text-zinc-500 font-mono">Base: {displayVal(startingBalance)}</span>
+            </label>
+
+            {inputMode === 'buffer' && (
+              <div className="relative">
+                <input
+                  type="number"
+                  step="any"
+                  min="0"
+                  value={bufferValue}
+                  onChange={(e) => {
+                    const val = Number(e.target.value);
+                    setBufferValue(val);
+                    setFloorValue(startingBalance - val);
+                    setPercentValue(startingBalance > 0 ? Number(((val / startingBalance) * 100).toFixed(1)) : 0);
+                  }}
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl px-5 py-3.5 text-lg font-mono font-bold text-white placeholder:text-zinc-700 outline-none focus:border-indigo-500 transition-all"
+                  placeholder="e.g. 1000"
+                  required
+                />
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-black text-zinc-500 uppercase">{currency}</span>
+              </div>
+            )}
+
+            {inputMode === 'floor' && (
+              <div className="relative">
+                <input
+                  type="number"
+                  step="any"
+                  min="0"
+                  value={floorValue}
+                  onChange={(e) => {
+                    const val = Number(e.target.value);
+                    setFloorValue(val);
+                    const buf = startingBalance - val;
+                    setBufferValue(Math.max(0, buf));
+                    setPercentValue(startingBalance > 0 ? Number(((buf / startingBalance) * 100).toFixed(1)) : 0);
+                  }}
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl px-5 py-3.5 text-lg font-mono font-bold text-white placeholder:text-zinc-700 outline-none focus:border-indigo-500 transition-all"
+                  placeholder="e.g. 9000"
+                  required
+                />
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-black text-zinc-500 uppercase">{currency}</span>
+              </div>
+            )}
+
+            {inputMode === 'percent' && (
+              <div className="relative">
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0.1"
+                  max="100"
+                  value={percentValue}
+                  onChange={(e) => {
+                    const val = Number(e.target.value);
+                    setPercentValue(val);
+                    const buf = startingBalance * (val / 100);
+                    setBufferValue(buf);
+                    setFloorValue(startingBalance - buf);
+                  }}
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl px-5 py-3.5 text-lg font-mono font-bold text-white placeholder:text-zinc-700 outline-none focus:border-indigo-500 transition-all"
+                  placeholder="e.g. 10.0"
+                  required
+                />
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-black text-zinc-500 uppercase">%</span>
+              </div>
+            )}
+          </div>
+
+          {/* Real-time Calculation Preview Card */}
+          <div className="p-4 bg-zinc-950 border border-zinc-800/80 rounded-2xl space-y-3">
+            <div className="flex items-center justify-between border-b border-zinc-800/60 pb-2">
+              <span className="text-[10px] font-black text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Activity className="w-3.5 h-3.5 text-indigo-400" />
+                Live DDL Impact Preview
+              </span>
+              <span className={cn(
+                "text-[9px] font-black uppercase px-2 py-0.5 rounded-lg border",
+                isBreached ? "bg-rose-500/20 text-rose-400 border-rose-500/30" :
+                isCritical ? "bg-rose-500/10 text-rose-300 border-rose-500/20" :
+                isWarning ? "bg-amber-500/10 text-amber-300 border-amber-500/20" :
+                "bg-emerald-500/10 text-emerald-300 border-emerald-500/20"
+              )}>
+                {isBreached ? 'Drawdown Breached' : isCritical ? 'Critical (<30%)' : isWarning ? 'Caution (<65%)' : 'Healthy Buffer'}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              <div>
+                <p className="text-[9px] text-zinc-500 uppercase font-black tracking-widest">Drawdown Floor (DDL)</p>
+                <p className="font-mono font-bold text-white mt-0.5">{displayVal(effectiveFloor)}</p>
+              </div>
+              <div>
+                <p className="text-[9px] text-zinc-500 uppercase font-black tracking-widest">Allowed Drawdown Budget</p>
+                <p className="font-mono font-bold text-zinc-300 mt-0.5">{displayVal(effectiveLimit)} ({((effectiveLimit / (startingBalance || 1)) * 100).toFixed(1)}%)</p>
+              </div>
+              <div className="col-span-2 pt-2 border-t border-zinc-800/50 flex items-center justify-between">
+                <div>
+                  <p className="text-[10px] text-indigo-400 uppercase font-black tracking-widest">Distance to Drawdown (DDL)</p>
+                  <p className={cn(
+                    "text-base font-mono font-black mt-0.5",
+                    isBreached ? "text-rose-400" : isCritical ? "text-rose-300" : isWarning ? "text-amber-400" : "text-emerald-400"
+                  )}>
+                    {displayVal(distanceToDDL, true)}
+                    <span className="text-xs font-mono font-bold ml-1.5 opacity-80">
+                      ({distancePct >= 0 ? '+' : ''}{distancePct.toFixed(2)}% of account)
+                    </span>
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[9px] text-zinc-500 uppercase font-black tracking-widest">Buffer Health</p>
+                  <p className="text-xs font-mono font-bold text-zinc-300 mt-0.5">{bufferPercentLeft.toFixed(1)}%</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 py-3.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="flex-1 py-3.5 bg-white hover:bg-zinc-200 text-black rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-xl shadow-white/5 active:scale-95"
+            >
+              Save DDL
+            </button>
+          </div>
+        </form>
+      </motion.div>
+    </div>
+  );
+};
+
+const DDLMonitorBar = ({
+  startingBalance,
+  currentBalance,
+  currency,
+  hidePnL,
+  settings,
+  onOpenModal
+}: {
+  startingBalance: number;
+  currentBalance: number;
+  currency: string;
+  hidePnL: boolean;
+  settings: UserSettings;
+  onOpenModal: () => void;
+}) => {
+  const defaultBuffer = settings.maxDrawdownLimit ?? (startingBalance * 0.1);
+  const effectiveFloor = settings.drawdownFloor ?? (startingBalance - defaultBuffer);
+  const effectiveLimit = settings.maxDrawdownLimit ?? (startingBalance - effectiveFloor);
+
+  const distanceToDDL = currentBalance - effectiveFloor;
+  const distancePct = startingBalance > 0 ? (distanceToDDL / startingBalance) * 100 : 0;
+  const totalBuffer = effectiveLimit > 0 ? effectiveLimit : startingBalance * 0.1;
+  const bufferPercentLeft = totalBuffer > 0 ? Math.max(0, Math.min(100, (distanceToDDL / totalBuffer) * 100)) : 0;
+
+  const isBreached = distanceToDDL <= 0;
+  const isCritical = !isBreached && bufferPercentLeft < 30;
+  const isWarning = !isBreached && !isCritical && bufferPercentLeft < 65;
+
+  const displayVal = (val: number, showSign: boolean = false) => {
+    if (hidePnL) return '***';
+    const sign = showSign && val > 0 ? '+' : '';
+    return sign + formatCurrency(val, currency);
+  };
+
+  return (
+    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 sm:p-6 relative overflow-hidden">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-4">
+        <div className="flex items-center gap-3">
+          <div className={cn(
+            "w-10 h-10 rounded-xl flex items-center justify-center border transition-all shrink-0",
+            isBreached ? "bg-rose-500/10 text-rose-400 border-rose-500/30 shadow-[0_0_15px_rgba(244,63,94,0.2)]" :
+            isCritical ? "bg-rose-500/10 text-rose-300 border-rose-500/20" :
+            isWarning ? "bg-amber-500/10 text-amber-300 border-amber-500/20" :
+            "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+          )}>
+            {isBreached ? <ShieldAlert className="w-5 h-5" /> : <ShieldCheck className="w-5 h-5" />}
+          </div>
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="text-sm font-bold text-white uppercase tracking-tight">Distance to Drawdown (DDL)</h3>
+              <span className={cn(
+                "text-[9px] font-black uppercase px-2 py-0.5 rounded-md border",
+                isBreached ? "bg-rose-500/20 text-rose-400 border-rose-500/30 animate-pulse" :
+                isCritical ? "bg-rose-500/10 text-rose-300 border-rose-500/20" :
+                isWarning ? "bg-amber-500/10 text-amber-300 border-amber-500/20" :
+                "bg-emerald-500/10 text-emerald-300 border-emerald-500/20"
+              )}>
+                {isBreached ? 'Drawdown Breached' : isCritical ? 'Critical Warning' : isWarning ? 'Moderate Cushion' : 'Safe Capital Cushion'}
+              </span>
+            </div>
+            <p className="text-[10px] text-zinc-500 uppercase font-bold tracking-widest mt-0.5">
+              Live Remaining Risk Buffer To Hard Account Floor
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3 justify-between sm:justify-end">
+          <div className="text-left sm:text-right">
+            <p className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">Live DDL Distance</p>
+            <p className={cn(
+              "text-lg font-mono font-black",
+              isBreached ? "text-rose-400" : isCritical ? "text-rose-300" : isWarning ? "text-amber-400" : "text-emerald-400"
+            )}>
+              {displayVal(distanceToDDL, true)}
+              <span className="text-xs font-mono ml-1 text-zinc-400 font-bold">
+                ({distancePct >= 0 ? '+' : ''}{distancePct.toFixed(2)}%)
+              </span>
+            </p>
+          </div>
+          <button
+            onClick={onOpenModal}
+            className="px-4 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border border-zinc-700 hover:border-zinc-600 flex items-center gap-1.5 active:scale-95 shadow-md shrink-0"
+            title="Manually configure DDL"
+          >
+            <Sliders className="w-3.5 h-3.5 text-emerald-400" />
+            Set DDL
+          </button>
+        </div>
+      </div>
+
+      {/* Visual Buffer Progress Gauge */}
+      <div className="space-y-1.5">
+        <div className="flex justify-between text-[9px] font-black uppercase tracking-wider text-zinc-400 font-mono">
+          <span>Floor: {displayVal(effectiveFloor)}</span>
+          <span>Buffer Remaining: {bufferPercentLeft.toFixed(1)}%</span>
+          <span>Base: {displayVal(startingBalance)}</span>
+        </div>
+        <div className="w-full h-2.5 bg-zinc-950 rounded-full border border-zinc-800/80 p-0.5 overflow-hidden flex">
+          <div
+            className={cn(
+              "h-full rounded-full transition-all duration-700",
+              isBreached ? "bg-rose-500" :
+              isCritical ? "bg-rose-400" :
+              isWarning ? "bg-amber-400" :
+              "bg-gradient-to-r from-emerald-500 to-emerald-400"
+            )}
+            style={{ width: `${Math.max(2, Math.min(100, bufferPercentLeft))}%` }}
+          />
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // --- Pages ---
 
-const Dashboard = ({ stats, trades, onTabChange, profileName, currency, hidePnL, user, onUpdateTrade, startingBalance, onSelectExecution }: { 
+const Dashboard = ({ 
+  stats, 
+  trades, 
+  onTabChange, 
+  profileName, 
+  currency, 
+  hidePnL, 
+  user, 
+  onUpdateTrade, 
+  startingBalance, 
+  onSelectExecution,
+  settings,
+  onUpdateSettings
+}: { 
   stats: DashboardStats, 
   trades: Trade[], 
   onTabChange: (tab: string) => void, 
@@ -1199,9 +1658,12 @@ const Dashboard = ({ stats, trades, onTabChange, profileName, currency, hidePnL,
   user: User | null, 
   onUpdateTrade: (id: string, updates: Partial<Trade>) => void, 
   startingBalance: number,
-  onSelectExecution: (id: string) => void
+  onSelectExecution: (id: string) => void,
+  settings: UserSettings,
+  onUpdateSettings: (settings: UserSettings) => void
 }) => {
   const [showExportModal, setShowExportModal] = useState(false);
+  const [showDDLModal, setShowDDLModal] = useState(false);
   const [selectedRange, setSelectedRange] = useState('All Time');
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
   const [chartType, setChartType] = useState<'line' | 'ogive' | 'scatter' | 'cubic' | 'bar'>('ogive');
@@ -1285,6 +1747,24 @@ const Dashboard = ({ stats, trades, onTabChange, profileName, currency, hidePnL,
   const totalBalance = startingBalance + stats.totalPnL;
   const totalAccountPct = (startingBalance && startingBalance > 0) ? (stats.totalPnL / startingBalance) * 100 : 0;
 
+  // DDL (Distance to Drawdown) Calculations
+  const defaultBuffer = settings.maxDrawdownLimit ?? (startingBalance * 0.1);
+  const effectiveFloor = settings.drawdownFloor ?? (startingBalance - defaultBuffer);
+  const effectiveLimit = settings.maxDrawdownLimit ?? (startingBalance - effectiveFloor);
+  const distanceToDDL = totalBalance - effectiveFloor;
+  const distancePctOfAccount = startingBalance > 0 ? (distanceToDDL / startingBalance) * 100 : 0;
+  const totalAllowedBuffer = effectiveLimit > 0 ? effectiveLimit : startingBalance * 0.1;
+  const bufferPercentRemaining = totalAllowedBuffer > 0 ? Math.max(0, Math.min(100, (distanceToDDL / totalAllowedBuffer) * 100)) : 0;
+
+  const handleSaveDDL = (updates: { maxDrawdownLimit: number; drawdownFloor: number; drawdownInputMode: 'buffer' | 'floor' | 'percent' }) => {
+    onUpdateSettings({
+      ...settings,
+      maxDrawdownLimit: updates.maxDrawdownLimit,
+      drawdownFloor: updates.drawdownFloor,
+      drawdownInputMode: updates.drawdownInputMode
+    });
+  };
+
   return (
     <div className="space-y-8">
         <ScrollAnimatedSection>
@@ -1299,8 +1779,20 @@ const Dashboard = ({ stats, trades, onTabChange, profileName, currency, hidePnL,
             startingBalance={startingBalance}
           />
         </ScrollAnimatedSection>
+
+        {/* Distance to Drawdown Monitor Banner */}
+        <ScrollAnimatedSection delay={0.05}>
+          <DDLMonitorBar
+            startingBalance={startingBalance}
+            currentBalance={totalBalance}
+            currency={currency}
+            hidePnL={hidePnL}
+            settings={settings}
+            onOpenModal={() => setShowDDLModal(true)}
+          />
+        </ScrollAnimatedSection>
         
-        <ScrollAnimatedSection delay={0.1} className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+        <ScrollAnimatedSection delay={0.1} className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3 sm:gap-4">
           <StatsCard 
             label="Starting Balance" 
             value={displayValue(startingBalance)} 
@@ -1318,6 +1810,25 @@ const Dashboard = ({ stats, trades, onTabChange, profileName, currency, hidePnL,
             type={stats.totalPnL >= 0 ? 'profit' : 'loss'}
             subValue={`${totalAccountPct >= 0 ? '+' : ''}${totalAccountPct.toFixed(2)}% of account`}
             trend={{ val: `${Math.abs(totalAccountPct).toFixed(2)}%`, positive: stats.totalPnL >= 0 }}
+          />
+          <StatsCard 
+            label="Distance to DDL" 
+            value={displayValue(distanceToDDL, true)} 
+            type={distanceToDDL <= 0 ? 'loss' : distanceToDDL >= totalAllowedBuffer * 0.5 ? 'profit' : 'normal'}
+            subValue={`${distancePctOfAccount >= 0 ? '+' : ''}${distancePctOfAccount.toFixed(2)}% cushion`}
+            action={
+              <button 
+                onClick={() => setShowDDLModal(true)} 
+                className="p-1 hover:bg-zinc-800 text-zinc-500 hover:text-emerald-400 rounded-md transition-colors"
+                title="Manually configure DDL"
+              >
+                <Edit2 className="w-3 h-3" />
+              </button>
+            }
+            progressBar={{
+              percent: bufferPercentRemaining,
+              color: distanceToDDL <= 0 ? "bg-rose-500" : bufferPercentRemaining < 30 ? "bg-rose-400" : bufferPercentRemaining < 65 ? "bg-amber-400" : "bg-emerald-500"
+            }}
           />
           <StatsCard 
             label="Win Rate" 
@@ -1340,6 +1851,21 @@ const Dashboard = ({ stats, trades, onTabChange, profileName, currency, hidePnL,
             subValue="Last 30 Days"
           />
         </ScrollAnimatedSection>
+
+        {/* DDL Configuration Modal */}
+        <AnimatePresence>
+          {showDDLModal && (
+            <DDLModal
+              startingBalance={startingBalance}
+              currentBalance={totalBalance}
+              currency={currency}
+              settings={settings}
+              onClose={() => setShowDDLModal(false)}
+              onSave={handleSaveDDL}
+              hidePnL={hidePnL}
+            />
+          )}
+        </AnimatePresence>
 
       <ScrollAnimatedSection delay={0.2} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 bg-zinc-900 border border-zinc-800 p-5 rounded-xl">
@@ -5118,6 +5644,98 @@ const Settings = ({
                 className="absolute top-1 w-4 h-4 bg-white rounded-full transition-all" 
               />
             </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Drawdown Limit (DDL) Risk Controls */}
+      <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-xl shadow-xl space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <h3 className="text-xl font-bold text-zinc-100 font-serif tracking-tight flex items-center gap-2">
+              <ShieldAlert className="w-5 h-5 text-indigo-400" />
+              Distance to Drawdown (DDL) Configuration
+            </h3>
+            <p className="text-xs text-zinc-500 mt-1">
+              Manually configure your maximum drawdown limit, cash buffer, or floor balance displayed on the Dashboard.
+            </p>
+          </div>
+          <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest px-3 py-1 bg-indigo-500/10 border border-indigo-500/20 rounded-full self-start sm:self-auto">
+            Live Risk Meter
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="p-4 bg-zinc-950 border border-zinc-800 rounded-2xl space-y-2">
+            <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block">Input Mode</label>
+            <select
+              value={settings.drawdownInputMode || 'buffer'}
+              onChange={(e) => {
+                const mode = e.target.value as 'buffer' | 'floor' | 'percent';
+                onUpdateSettings({ ...settings, drawdownInputMode: mode });
+              }}
+              className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-indigo-500"
+            >
+              <option value="buffer">Max Loss Buffer ($)</option>
+              <option value="floor">Hard Floor Balance ($)</option>
+              <option value="percent">Percentage Drawdown (%)</option>
+            </select>
+          </div>
+
+          <div className="p-4 bg-zinc-950 border border-zinc-800 rounded-2xl space-y-2">
+            <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block">
+              {(settings.drawdownInputMode || 'buffer') === 'buffer' ? `Max Loss Buffer (${settings.currency})` :
+               (settings.drawdownInputMode || 'buffer') === 'floor' ? `Floor Balance (${settings.currency})` :
+               'Max Drawdown Limit (%)'}
+            </label>
+            <input
+              type="number"
+              step="any"
+              defaultValue={
+                (settings.drawdownInputMode || 'buffer') === 'buffer'
+                  ? (settings.maxDrawdownLimit ?? (settings.startingBalance * 0.1))
+                  : (settings.drawdownInputMode || 'buffer') === 'floor'
+                  ? (settings.drawdownFloor ?? (settings.startingBalance * 0.9))
+                  : (((settings.maxDrawdownLimit ?? (settings.startingBalance * 0.1)) / (settings.startingBalance || 1)) * 100)
+              }
+              onBlur={(e) => {
+                const val = Number(e.target.value);
+                const mode = settings.drawdownInputMode || 'buffer';
+                if (mode === 'buffer') {
+                  onUpdateSettings({
+                    ...settings,
+                    maxDrawdownLimit: val,
+                    drawdownFloor: settings.startingBalance - val
+                  });
+                } else if (mode === 'floor') {
+                  onUpdateSettings({
+                    ...settings,
+                    drawdownFloor: val,
+                    maxDrawdownLimit: Math.max(0, settings.startingBalance - val)
+                  });
+                } else {
+                  const buf = settings.startingBalance * (val / 100);
+                  onUpdateSettings({
+                    ...settings,
+                    maxDrawdownLimit: buf,
+                    drawdownFloor: settings.startingBalance - buf
+                  });
+                }
+              }}
+              className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs font-mono font-bold text-white outline-none focus:border-indigo-500"
+            />
+          </div>
+
+          <div className="p-4 bg-zinc-950 border border-zinc-800 rounded-2xl space-y-1 flex flex-col justify-between">
+            <div>
+              <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Effective DDL Floor</p>
+              <p className="text-sm font-mono font-bold text-white mt-1">
+                {formatCurrency(settings.drawdownFloor ?? (settings.startingBalance - (settings.maxDrawdownLimit ?? (settings.startingBalance * 0.1))), settings.currency)}
+              </p>
+            </div>
+            <p className="text-[10px] text-zinc-500">
+              Allowed Loss: {formatCurrency(settings.maxDrawdownLimit ?? (settings.startingBalance * 0.1), settings.currency)}
+            </p>
           </div>
         </div>
       </div>
@@ -8944,7 +9562,9 @@ export default function App() {
       setTrades(convertedTrades);
       const updatedSettings = {
         ...newSettings,
-        startingBalance: settings.startingBalance * rate
+        startingBalance: settings.startingBalance * rate,
+        maxDrawdownLimit: newSettings.maxDrawdownLimit ? newSettings.maxDrawdownLimit * rate : undefined,
+        drawdownFloor: newSettings.drawdownFloor ? newSettings.drawdownFloor * rate : undefined
       };
       setSettings(updatedSettings);
       
@@ -9506,6 +10126,8 @@ export default function App() {
                       setSelectedExecutionId(id);
                       setActiveTab('execution');
                     }}
+                    settings={settings}
+                    onUpdateSettings={handleUpdateSettings}
                   />
                 )}
                 {activeTab === 'journal' && (

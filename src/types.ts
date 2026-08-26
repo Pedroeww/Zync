@@ -53,6 +53,9 @@ export interface UserSettings {
   checklistTargetAmount?: number;
   checklistTargetPeriod?: 'daily' | 'weekly' | 'monthly' | 'yearly' | 'overall';
   checklistTargetType?: 'profit' | 'discipline';
+  maxDrawdownLimit?: number; // Manually inputed Max Drawdown buffer or custom DDL amount
+  drawdownFloor?: number; // Manually inputed Drawdown Floor level
+  drawdownInputMode?: 'buffer' | 'floor' | 'percent'; // Mode of DDL calculation
 }
 
 export interface Account {

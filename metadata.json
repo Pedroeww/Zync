@@ -2,5 +2,7 @@
   "name": "Zync Trading Journal",
   "description": "A professional-grade trading journal and analytics dashboard for organizing, tracking, and analyzing market performance.",
   "requestFramePermissions": [],
-  "majorCapabilities": []
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }
